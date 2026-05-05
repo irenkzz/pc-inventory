@@ -274,6 +274,121 @@ function Ensure-DirectRunnerOutbox {
     return $outboxRoot
 }
 
+function Test-PathUnderRoot {
+    param(
+        [string]$Path,
+        [string]$Root
+    )
+
+    try {
+        $resolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+        $resolvedRoot = (Resolve-Path -LiteralPath $Root -ErrorAction Stop).ProviderPath.TrimEnd('\')
+    }
+    catch {
+        return $false
+    }
+
+    return $resolvedPath.Equals($resolvedRoot, [StringComparison]::OrdinalIgnoreCase) `
+        -or $resolvedPath.StartsWith($resolvedRoot + '\', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Invoke-DirectOutboxFolderCleanup {
+    param(
+        [string]$OutboxRoot,
+        [string]$FolderName,
+        [int]$RetentionDays,
+        [int]$RetainNewestCount,
+        [datetime]$Now
+    )
+
+    $folder = Join-Path $OutboxRoot $FolderName
+    if (-not (Test-PathUnderRoot -Path $folder -Root $OutboxRoot)) {
+        Write-RunnerLog "Direct HTTPS outbox cleanup warning: skipped folder outside outbox root folder=$FolderName"
+        return [PSCustomObject]@{
+            Folder = $FolderName
+            Deleted = 0
+            Retained = 0
+            Skipped = 0
+        }
+    }
+
+    $cutoff = $Now.AddDays(-1 * $RetentionDays)
+    $knownFiles = @()
+    $skipped = 0
+
+    foreach ($file in @(Get-ChildItem -Path $folder -File -ErrorAction Stop)) {
+        $extension = ([string]$file.Extension).ToLowerInvariant()
+        if ($extension -in @('.csv', '.json')) {
+            $knownFiles += $file
+        } else {
+            $skipped++
+        }
+    }
+
+    $orderedKnownFiles = @($knownFiles | Sort-Object LastWriteTime -Descending)
+    $newestRetained = @{}
+    for ($index = 0; $index -lt $orderedKnownFiles.Count -and $index -lt $RetainNewestCount; $index++) {
+        $newestRetained[$orderedKnownFiles[$index].FullName] = $true
+    }
+
+    $deleted = 0
+    $retained = 0
+    foreach ($file in $orderedKnownFiles) {
+        if ($newestRetained.ContainsKey($file.FullName)) {
+            $retained++
+            continue
+        }
+
+        if ($file.LastWriteTime -ge $cutoff) {
+            $retained++
+            continue
+        }
+
+        if (-not (Test-PathUnderRoot -Path $file.FullName -Root $OutboxRoot)) {
+            $skipped++
+            continue
+        }
+
+        Remove-Item -LiteralPath $file.FullName -Force -ErrorAction Stop
+        $deleted++
+    }
+
+    return [PSCustomObject]@{
+        Folder = $FolderName
+        Deleted = $deleted
+        Retained = $retained
+        Skipped = $skipped
+    }
+}
+
+function Invoke-DirectOutboxCleanup {
+    param([string]$OutboxRoot)
+
+    Ensure-Directory $OutboxRoot
+    $pendingDir = Join-Path $OutboxRoot 'pending'
+    $sentDir = Join-Path $OutboxRoot 'sent'
+    $failedDir = Join-Path $OutboxRoot 'failed'
+    Ensure-Directory $pendingDir
+    Ensure-Directory $sentDir
+    Ensure-Directory $failedDir
+
+    if (-not (Test-PathUnderRoot -Path $sentDir -Root $OutboxRoot)) {
+        Write-RunnerLog 'Direct HTTPS outbox cleanup warning: sent folder is outside outbox root; cleanup skipped.'
+        return
+    }
+    if (-not (Test-PathUnderRoot -Path $failedDir -Root $OutboxRoot)) {
+        Write-RunnerLog 'Direct HTTPS outbox cleanup warning: failed folder is outside outbox root; cleanup skipped.'
+        return
+    }
+
+    $now = Get-Date
+    $sent = Invoke-DirectOutboxFolderCleanup -OutboxRoot $OutboxRoot -FolderName 'sent' -RetentionDays 14 -RetainNewestCount 100 -Now $now
+    $failed = Invoke-DirectOutboxFolderCleanup -OutboxRoot $OutboxRoot -FolderName 'failed' -RetentionDays 30 -RetainNewestCount 100 -Now $now
+
+    Write-RunnerLog ("Direct HTTPS outbox cleanup summary sent_deleted={0} sent_retained={1} sent_skipped={2} failed_deleted={3} failed_retained={4} failed_skipped={5} pending_deleted=0" -f `
+        $sent.Deleted, $sent.Retained, $sent.Skipped, $failed.Deleted, $failed.Retained, $failed.Skipped)
+}
+
 function Get-FileSha256 {
     param([string]$Path)
 
@@ -1009,6 +1124,13 @@ if ($transportMode -eq 'direct_https') {
         $ackMessage = 'Direct HTTPS phase=ack retry loop failed: ' + $_.Exception.Message
         Write-RunnerLog $ackMessage
         Set-ObjectProperty -Object $state -Name 'last_direct_ack_error' -Value $ackMessage
+    }
+
+    try {
+        Invoke-DirectOutboxCleanup -OutboxRoot $outboxRoot
+    }
+    catch {
+        Write-RunnerLog ('Direct HTTPS outbox cleanup warning: ' + $_.Exception.Message)
     }
 
     Write-JsonFile -Path $statePath -Value $state
