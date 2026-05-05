@@ -244,6 +244,84 @@ class RunnerCommandPortalTest extends TestCase
             ->assertDontSee('direct-token-secret-not-rendered');
     }
 
+    public function test_direct_runner_detail_uses_direct_upload_as_last_inventory(): void
+    {
+        $runner = $this->runner([
+            'runner_id' => 'LAPTOP-I76TA97E',
+            'hostname' => 'LAPTOP-I76TA97E',
+            'transport_mode' => 'direct_https',
+            'last_successful_inventory_at' => null,
+            'last_inventory_status' => null,
+            'last_upload_status' => null,
+            'last_direct_upload_at' => '2026-05-04 09:10:00',
+            'last_upload_error' => null,
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get(route('admin.runners.show', $runner))
+            ->assertOk()
+            ->assertSee('Runner Health')
+            ->assertSee(\App\Support\InventoryTime::format('2026-05-04 09:10:00'))
+            ->assertSee('Uploaded')
+            ->assertDontSee('No direct upload yet');
+    }
+
+    public function test_direct_runner_detail_without_direct_upload_uses_calm_health_wording(): void
+    {
+        $runner = $this->runner([
+            'runner_id' => 'PC-DIRECT-NO-UPLOAD',
+            'hostname' => 'PC-DIRECT-NO-UPLOAD',
+            'transport_mode' => 'direct_https',
+            'last_successful_inventory_at' => null,
+            'last_inventory_status' => null,
+            'last_upload_status' => null,
+            'last_direct_upload_at' => null,
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get(route('admin.runners.show', $runner))
+            ->assertOk()
+            ->assertSee('Runner Health')
+            ->assertSee('No direct upload yet');
+    }
+
+    public function test_collector_share_runner_detail_health_display_remains_unchanged(): void
+    {
+        $runner = $this->runner([
+            'runner_id' => 'PC-COLLECTOR-HEALTH',
+            'hostname' => 'PC-COLLECTOR-HEALTH',
+            'transport_mode' => 'collector_share',
+            'last_successful_inventory_at' => '2026-05-04 08:00:00',
+            'last_inventory_status' => 'success',
+            'last_upload_status' => 'uploaded',
+            'last_direct_upload_at' => null,
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get(route('admin.runners.show', $runner))
+            ->assertOk()
+            ->assertSee(\App\Support\InventoryTime::format('2026-05-04 08:00:00'))
+            ->assertSee('success')
+            ->assertSee('uploaded')
+            ->assertDontSee('No direct upload yet');
+    }
+
+    public function test_direct_runner_detail_does_not_render_active_repair_update_queue_action(): void
+    {
+        $runner = $this->runner([
+            'runner_id' => 'PC-DIRECT-NO-REPAIR',
+            'hostname' => 'PC-DIRECT-NO-REPAIR',
+            'transport_mode' => 'direct_https',
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get(route('admin.runners.show', $runner))
+            ->assertOk()
+            ->assertSee('Repair/update blocked for Direct HTTPS MVP')
+            ->assertSee('repair_update blocked for Direct HTTPS MVP')
+            ->assertDontSee('Queue repair/update');
+    }
+
     public function test_direct_runner_detail_uses_calm_missing_data_wording(): void
     {
         $runner = $this->runner([
