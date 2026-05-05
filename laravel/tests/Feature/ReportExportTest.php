@@ -23,8 +23,8 @@ class ReportExportTest extends TestCase
         ]));
 
         $ingest = app(InventoryIngestService::class);
-        $ingest->ingestCsvText((string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv')), 'sample_scan_1.csv', 'test_import');
-        $ingest->ingestCsvText((string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_2.csv')), 'sample_scan_2.csv', 'test_import');
+        $ingest->ingestCsvText((string) $this->fixtureContents('sample_data/sample_scan_1.csv'), 'sample_scan_1.csv', 'test_import');
+        $ingest->ingestCsvText((string) $this->fixtureContents('sample_data/sample_scan_2.csv'), 'sample_scan_2.csv', 'test_import');
 
         $devicesResponse = $this->get('/reports/devices/export')
             ->assertOk()

@@ -217,13 +217,13 @@ class ApiSecurityTest extends TestCase
     {
         Config::set('inventory.central_intake_token', 'central-secret');
 
-        $file = UploadedFile::fake()->createWithContent('scan.csv', (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv')));
+        $file = UploadedFile::fake()->createWithContent('scan.csv', (string) $this->fixtureContents('sample_data/sample_scan_1.csv'));
 
         $this->post('/api/intake/csv', [
             'file' => $file,
         ])->assertUnauthorized();
 
-        $file = UploadedFile::fake()->createWithContent('scan.csv', (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv')));
+        $file = UploadedFile::fake()->createWithContent('scan.csv', (string) $this->fixtureContents('sample_data/sample_scan_1.csv'));
 
         $this->post('/api/intake/csv', [
             'file' => $file,

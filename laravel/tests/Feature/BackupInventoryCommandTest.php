@@ -20,7 +20,7 @@ class BackupInventoryCommandTest extends TestCase
         Config::set('inventory.raw_archive_path', 'framework/testing/raw_archive');
 
         app(InventoryIngestService::class)->ingestCsvText(
-            (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv')),
+            (string) $this->fixtureContents('sample_data/sample_scan_1.csv'),
             'sample_scan_1.csv',
             'test_import',
         );
