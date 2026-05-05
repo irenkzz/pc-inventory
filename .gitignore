@@ -82,3 +82,18 @@ Thumbs.db
 # Real local/pilot profiles may contain live URLs/tokens
 deployment/profiles/*.pilot.json
 !deployment/profiles/*.pilot.example.json
+
+# Local reports / generated project snapshots
+*_repair_update_report.txt
+project_tree.txt
+
+# Archives / packaged snapshots
+*.rar
+*.7z
+*.zip
+
+# PHPUnit local cache
+laravel/.phpunit.result.cache
+
+# Laravel runtime storage - never commit live runtime contents
+laravel/storage/
