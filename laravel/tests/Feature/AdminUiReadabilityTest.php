@@ -132,6 +132,84 @@ class AdminUiReadabilityTest extends TestCase
             ->assertSee('Healthy');
     }
 
+    public function test_runners_list_uses_direct_upload_as_last_inventory(): void
+    {
+        $this->travelTo('2026-05-04 10:00:00');
+
+        Runner::query()->create([
+            'runner_id' => 'LAPTOP-I76TA97E',
+            'hostname' => 'LAPTOP-I76TA97E',
+            'runner_version' => '1.0.21',
+            'last_seen_at' => now(),
+            'last_direct_heartbeat_at' => now(),
+            'transport_mode' => 'direct_https',
+            'last_successful_inventory_at' => null,
+            'last_inventory_status' => null,
+            'last_upload_status' => null,
+            'last_direct_upload_at' => '2026-05-04 09:10:00',
+            'last_upload_error' => null,
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get('/runners')
+            ->assertOk()
+            ->assertSee('LAPTOP-I76TA97E')
+            ->assertSee(\App\Support\InventoryTime::format('2026-05-04 09:10:00'))
+            ->assertSee('Uploaded')
+            ->assertDontSee('No direct upload yet')
+            ->assertDontSee('- / -');
+    }
+
+    public function test_runners_list_uses_calm_direct_upload_missing_wording(): void
+    {
+        $this->travelTo('2026-05-04 10:00:00');
+
+        Runner::query()->create([
+            'runner_id' => 'PC-DIRECT-NO-UPLOAD',
+            'hostname' => 'PC-DIRECT-NO-UPLOAD',
+            'runner_version' => '1.0.21',
+            'last_seen_at' => now(),
+            'last_direct_heartbeat_at' => now(),
+            'transport_mode' => 'direct_https',
+            'last_successful_inventory_at' => null,
+            'last_inventory_status' => null,
+            'last_upload_status' => null,
+            'last_direct_upload_at' => null,
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get('/runners')
+            ->assertOk()
+            ->assertSee('PC-DIRECT-NO-UPLOAD')
+            ->assertSee('No direct upload yet')
+            ->assertDontSee('- / -');
+    }
+
+    public function test_runners_list_collector_share_inventory_display_remains_unchanged(): void
+    {
+        $this->travelTo('2026-05-04 10:00:00');
+
+        Runner::query()->create([
+            'runner_id' => 'PC-COLLECTOR-HEALTH',
+            'hostname' => 'PC-COLLECTOR-HEALTH',
+            'runner_version' => '1.0.21',
+            'last_seen_at' => now(),
+            'transport_mode' => 'collector_share',
+            'last_successful_inventory_at' => '2026-05-04 08:00:00',
+            'last_inventory_status' => 'success',
+            'last_upload_status' => 'uploaded',
+            'last_direct_upload_at' => null,
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get('/runners')
+            ->assertOk()
+            ->assertSee('PC-COLLECTOR-HEALTH')
+            ->assertSee(\App\Support\InventoryTime::format('2026-05-04 08:00:00'))
+            ->assertSee('success / uploaded')
+            ->assertDontSee('No direct upload yet');
+    }
+
     public function test_collector_share_runner_missing_direct_poll_is_not_rendered_as_error(): void
     {
         $this->travelTo('2026-05-04 10:00:00');

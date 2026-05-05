@@ -74,6 +74,13 @@
                         && $activeCommand->requested_at->lt(now()->subHours(24));
                     $heartbeatMissing = $lastHeartbeat === null;
                     $heartbeatStale = $lastHeartbeat !== null && $lastHeartbeat->lt($freshSince);
+                    $directUploadError = trim((string) $runner->last_upload_error) !== '';
+                    $lastInventoryAt = $isDirect ? $runner->last_direct_upload_at : $runner->last_successful_inventory_at;
+                    $lastInventoryMissingLabel = $isDirect ? 'No direct upload yet' : null;
+                    $inventoryStatusSummary = $isDirect
+                        ? ($runner->last_direct_upload_at ? ($directUploadError ? 'Upload needs attention' : 'Uploaded') : 'No direct upload yet')
+                        : (($runner->last_inventory_status ?: '-') . ' / ' . ($runner->last_upload_status ?: '-'));
+                    $directUploadNote = $directUploadError ? trim((string) $runner->last_upload_error) : '';
 
                     if ($heartbeatMissing) {
                         $healthLabel = 'Waiting for first runner cycle';
@@ -125,7 +132,13 @@
                             Not applicable — collector-share mode
                         @endif
                     </td>
-                    <td>@inventoryTime($runner->last_successful_inventory_at)</td>
+                    <td>
+                        @if($lastInventoryAt)
+                            @inventoryTime($lastInventoryAt)
+                        @else
+                            {{ $lastInventoryMissingLabel ?? '-' }}
+                        @endif
+                    </td>
                     <td>
                         @if($activeCommand)
                             <span class="badge {{ $commandStatusClass($activeCommand->status) }}">{{ $commandLabel($activeCommand->command_type) }}</span>
@@ -143,7 +156,10 @@
                     </td>
                     <td>
                         <span class="badge {{ $healthClass }}"><span class="status-dot"></span>{{ $healthLabel }}</span>
-                        <div class="summary-meta">{{ $runner->last_inventory_status ?: '-' }} / {{ $runner->last_upload_status ?: '-' }}</div>
+                        <div class="summary-meta">{{ $inventoryStatusSummary }}</div>
+                        @if($isDirect && $directUploadNote !== '')
+                            <div class="summary-meta">{{ $directUploadNote }}</div>
+                        @endif
                     </td>
                     <td class="actions">
                         <form method="post" action="{{ route('admin.runners.manual-scan', $runner) }}">
