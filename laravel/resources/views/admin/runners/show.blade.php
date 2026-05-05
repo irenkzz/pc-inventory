@@ -16,6 +16,14 @@
             && $command->acknowledged_at === null
             && ($command->delivered_to_runner_at ?? $command->dispatched_at ?? $command->requested_at)?->lt(now()->subHours(24))
     );
+    $directUploadError = trim((string) $runner->last_upload_error) !== '';
+    $healthLastInventoryAt = $isDirect ? $runner->last_direct_upload_at : $runner->last_successful_inventory_at;
+    $healthInventoryStatus = $isDirect
+        ? ($runner->last_direct_upload_at ? ($directUploadError ? 'Upload needs attention' : 'Uploaded') : 'No direct upload yet')
+        : ($runner->last_inventory_status ?: '-');
+    $healthUploadNote = $isDirect
+        ? ($directUploadError ? $runner->last_upload_error : ($runner->last_upload_status ?: '-'))
+        : ($runner->last_upload_status ?: '-');
 
     $commandLabel = fn (?string $type): string => match ($type) {
         'scan_now' => 'Manual scan',
@@ -168,10 +176,14 @@
                     @csrf
                     <button type="submit" @disabled($hasScan)>Queue manual scan</button>
                 </form>
-                <form method="post" action="{{ route('admin.runners.repair', $runner) }}">
-                    @csrf
-                    <button class="secondary" type="submit" @disabled($hasRepair)>Queue repair/update</button>
-                </form>
+                @if($isDirect)
+                    <span class="badge warn">Repair/update blocked for Direct HTTPS MVP</span>
+                @else
+                    <form method="post" action="{{ route('admin.runners.repair', $runner) }}">
+                        @csrf
+                        <button class="secondary" type="submit" @disabled($hasRepair)>Queue repair/update</button>
+                    </form>
+                @endif
             </div>
             @if($activeCommand)
                 <div class="notice" style="margin-top:14px">
@@ -196,12 +208,20 @@
                 </div>
                 <div class="info-tile">
                     <span class="info-label">Last inventory</span>
-                    <span class="info-value">@inventoryTime($runner->last_successful_inventory_at)</span>
+                    <span class="info-value">
+                        @if($healthLastInventoryAt)
+                            @inventoryTime($healthLastInventoryAt)
+                        @elseif($isDirect)
+                            No direct upload yet
+                        @else
+                            @inventoryTime($healthLastInventoryAt)
+                        @endif
+                    </span>
                 </div>
                 <div class="info-tile">
                     <span class="info-label">Inventory status</span>
-                    <span class="info-value">{{ $runner->last_inventory_status ?: '-' }}</span>
-                    <span class="info-note">{{ $runner->last_upload_status ?: '-' }}</span>
+                    <span class="info-value">{{ $healthInventoryStatus }}</span>
+                    <span class="info-note">{{ $healthUploadNote }}</span>
                 </div>
                 <div class="info-tile">
                     <span class="info-label">Last command seen</span>
