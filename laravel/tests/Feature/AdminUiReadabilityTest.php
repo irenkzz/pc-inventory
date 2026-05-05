@@ -268,6 +268,48 @@ class AdminUiReadabilityTest extends TestCase
             ->assertDontSee('direct-secret-not-for-ui');
     }
 
+    public function test_runners_list_blocks_repair_update_action_for_direct_https_runner(): void
+    {
+        $this->travelTo('2026-05-04 10:00:00');
+
+        $runner = Runner::query()->create([
+            'runner_id' => 'PC-DIRECT-NO-REPAIR',
+            'hostname' => 'PC-DIRECT-NO-REPAIR',
+            'runner_version' => '1.0.21',
+            'last_seen_at' => now(),
+            'last_direct_heartbeat_at' => now(),
+            'transport_mode' => 'direct_https',
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get('/runners')
+            ->assertOk()
+            ->assertSee('PC-DIRECT-NO-REPAIR')
+            ->assertSee('Repair/update blocked for Direct HTTPS MVP')
+            ->assertDontSee(route('admin.runners.repair', $runner), false);
+    }
+
+    public function test_runners_list_keeps_repair_update_action_for_collector_share_runner(): void
+    {
+        $this->travelTo('2026-05-04 10:00:00');
+
+        $runner = Runner::query()->create([
+            'runner_id' => 'PC-COLLECTOR-REPAIR',
+            'hostname' => 'PC-COLLECTOR-REPAIR',
+            'runner_version' => '1.0.18',
+            'last_seen_at' => now(),
+            'transport_mode' => 'collector_share',
+        ]);
+
+        $this->actingAs($this->adminUser())
+            ->get('/runners')
+            ->assertOk()
+            ->assertSee('PC-COLLECTOR-REPAIR')
+            ->assertSee(route('admin.runners.repair', $runner), false)
+            ->assertSee('Repair/update')
+            ->assertDontSee('Repair/update blocked for Direct HTTPS MVP');
+    }
+
     private function adminUser(): User
     {
         return User::query()->create([

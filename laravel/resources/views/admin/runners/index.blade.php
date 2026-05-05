@@ -166,10 +166,14 @@
                             @csrf
                             <button type="submit" @disabled($hasScan)>Manual scan</button>
                         </form>
-                        <form method="post" action="{{ route('admin.runners.repair', $runner) }}">
-                            @csrf
-                            <button class="secondary" type="submit" @disabled($hasRepair)>Repair/update</button>
-                        </form>
+                        @if($isDirect)
+                            <span class="badge warn">Repair/update blocked for Direct HTTPS MVP</span>
+                        @else
+                            <form method="post" action="{{ route('admin.runners.repair', $runner) }}">
+                                @csrf
+                                <button class="secondary" type="submit" @disabled($hasRepair)>Repair/update</button>
+                            </form>
+                        @endif
                     </td>
                 </tr>
             @empty
