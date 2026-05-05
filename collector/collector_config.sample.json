@@ -1,0 +1,10 @@
+{
+  "site_id": "SITE-HQ",
+  "site_name": "Head Office",
+  "collector_name": "srv-server02-hq-collector",
+  "collector_version": "1.0.0",
+  "share_root": "\\\\srv-server02\\Shares\\PUBLIC\\Inventory\\sites\\SITE-HQ",
+  "server_base_url": "http://127.0.0.1:5000",
+  "site_token": "change-this-demo-token",
+  "poll_interval_minutes": 5
+}

@@ -1,0 +1,18 @@
+{
+  "_comment": "Example source profile for the second Direct HTTPS pilot. Replace server_base_url and direct_runner_token before generating a site kit. Do not use this file as-is.",
+  "_server_base_url_note": "Example only: use a real HTTPS endpoint such as https://inventory-pilot.internal.lan, backed by VPN/private tunnel plus an internal HTTPS reverse proxy. Do not use placeholder domains or plain HTTP.",
+  "transport_mode": "direct_https",
+  "collector_required": false,
+  "site_id": "SITE-HQ",
+  "site_name": "Bhayangkara",
+  "server_base_url": "https://inventory-pilot.internal.lan",
+  "direct_runner_token": "replace-this-with-real-direct-runner-token",
+  "runner_version": "1.0.21",
+  "scan_interval_minutes": 240,
+  "runner_poll_interval_minutes": 5,
+  "task_random_delay_minutes": 15,
+  "default_location": "Bhayangkara",
+  "default_room": "General",
+  "task_name": "InternalInventoryRunner",
+  "install_root": "C:\\ProgramData\\InternalInventoryRunner"
+}

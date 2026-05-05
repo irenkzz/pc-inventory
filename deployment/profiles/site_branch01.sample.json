@@ -1,0 +1,16 @@
+{
+  "site_id": "SITE-BRANCH-01",
+  "site_name": "Branch 01",
+  "collector_name": "branch01-collector",
+  "share_root": "\\\\branch-file01\\Inventory\\sites\\SITE-BRANCH-01",
+  "server_base_url": "https://inventory.example.local",
+  "site_token": "replace-this-with-real-site-token",
+  "runner_version": "1.0.0",
+  "scan_interval_minutes": 360,
+  "collector_poll_interval_minutes": 10,
+  "task_random_delay_minutes": 20,
+  "default_location": "Branch 01",
+  "default_room": "General",
+  "task_name": "InternalInventoryRunner",
+  "install_root": "C:\\ProgramData\\InternalInventoryRunner"
+}

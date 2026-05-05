@@ -1,0 +1,16 @@
+{
+  "transport_mode": "direct_https",
+  "collector_required": false,
+  "site_id": "SITE-HQ",
+  "site_name": "Bhayangkara",
+  "server_base_url": "https://inventory.example.local",
+  "direct_runner_token": "replace-this-with-real-direct-runner-token",
+  "runner_version": "1.0.0",
+  "scan_interval_minutes": 240,
+  "runner_poll_interval_minutes": 5,
+  "task_random_delay_minutes": 15,
+  "default_location": "Bhayangkara",
+  "default_room": "General",
+  "task_name": "InternalInventoryRunner",
+  "install_root": "C:\\ProgramData\\InternalInventoryRunner"
+}

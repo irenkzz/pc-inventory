@@ -1,0 +1,21 @@
+{
+  "runnerId": "PC-ACCOUNTING-01",
+  "runnerGuid": "generated-on-install",
+  "siteId": "SITE-HQ",
+  "siteName": "Head Office",
+  "collectorName": "srv-server02-hq-collector",
+  "transport_mode": "collector_share",
+  "serverBaseUrl": "",
+  "siteToken": "",
+  "sharedRoot": "\\\\srv-server02\\Shares\\PUBLIC\\Inventory\\sites\\SITE-HQ",
+  "location": "Head Office",
+  "room": "Accounting",
+  "runnerVersion": "1.0.0",
+  "scheduledTaskName": "InternalInventoryRunner",
+  "installRoot": "C:\\ProgramData\\InternalInventoryRunner",
+  "scanIntervalMinutes": 240,
+  "runnerPollIntervalMinutes": 5,
+  "runAtStartup": true,
+  "taskRandomDelayMinutes": 15,
+  "runAsCurrentUser": true
+}

@@ -1,0 +1,16 @@
+{
+  "site_id": "SITE-HQ",
+  "site_name": "Bhayangkara",
+  "collector_name": "srv-server02-hq-collector",
+  "share_root": "\\\\srv-server02\\Shares\\PUBLIC\\Inventory\\sites\\SITE-HQ",
+  "server_base_url": "http://127.0.0.1:8000",
+  "site_token": "replace-this-with-real-site-token",
+  "runner_version": "1.0.0",
+  "scan_interval_minutes": 240,
+  "collector_poll_interval_minutes": 5,
+  "task_random_delay_minutes": 15,
+  "default_location": "Bhayangkara",
+  "default_room": "General",
+  "task_name": "InternalInventoryRunner",
+  "install_root": "C:\\ProgramData\\InternalInventoryRunner"
+}

@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'raw_archive_disk' => env('INVENTORY_RAW_ARCHIVE_DISK', 'local'),
+    'raw_archive_path' => env('INVENTORY_RAW_ARCHIVE_PATH', 'inventory/raw_archive'),
+    'downloads_path' => env('INVENTORY_DOWNLOADS_PATH', 'inventory/downloads'),
+    'backups_path' => env('INVENTORY_BACKUPS_PATH', 'inventory/backups'),
+    'backup_schedule_enabled' => env('INVENTORY_BACKUP_SCHEDULE_ENABLED', false),
+    'backup_schedule_time' => env('INVENTORY_BACKUP_SCHEDULE_TIME', '01:30'),
+    'backup_retention_days' => env('INVENTORY_BACKUP_RETENTION_DAYS'),
+    'backup_include_downloads' => env('INVENTORY_BACKUP_INCLUDE_DOWNLOADS', false),
+    'display_timezone' => env('INVENTORY_DISPLAY_TIMEZONE'),
+    'display_timezone_label' => env('INVENTORY_DISPLAY_TIMEZONE_LABEL'),
+    'display_locale' => env('INVENTORY_DISPLAY_LOCALE'),
+    'display_datetime_format' => env('INVENTORY_DISPLAY_DATETIME_FORMAT'),
+    'display_decimal_separator' => env('INVENTORY_DISPLAY_DECIMAL_SEPARATOR'),
+    'display_thousands_separator' => env('INVENTORY_DISPLAY_THOUSANDS_SEPARATOR'),
+    'site_token_types' => ['collector', 'direct_runner'],
+    'site_tokens_json' => env('INVENTORY_SITE_TOKENS_JSON'),
+    'site_tokens_file' => env('INVENTORY_SITE_TOKENS_FILE', storage_path('app/inventory/site_tokens.json')),
+    'require_site_tokens' => env('INVENTORY_REQUIRE_SITE_TOKENS', false),
+    'central_intake_token' => env('INVENTORY_CENTRAL_INTAKE_TOKEN'),
+    'runner_target_version' => env('INVENTORY_RUNNER_TARGET_VERSION', '1.0.21'),
+    'direct_command_redelivery_minutes' => env('INVENTORY_DIRECT_COMMAND_REDELIVERY_MINUTES', 3),
+];

@@ -1,0 +1,84 @@
+﻿# =========================
+# Laravel secrets / env
+# =========================
+laravel/.env
+laravel/.env.*
+!laravel/.env.example
+
+# =========================
+# Databases / local DB files
+# =========================
+laravel/database/*.sqlite
+laravel/database/*.sqlite-*
+*.db
+*.sqlite
+*.sqlite-*
+
+# =========================
+# Laravel runtime storage
+# =========================
+laravel/storage/logs/
+laravel/storage/framework/cache/
+laravel/storage/framework/sessions/
+laravel/storage/framework/views/
+
+# =========================
+# Inventory operational state
+# =========================
+laravel/storage/app/inventory/site_tokens.json
+laravel/storage/app/inventory/downloads/
+laravel/storage/app/inventory/raw_archive/
+laravel/storage/app/inventory/backups/
+laravel/storage/app/inventory/site_kits/
+laravel/storage/app/inventory/generated/
+
+# =========================
+# Generated deployment/site-kit artifacts
+# =========================
+deployment/profiles/generated/
+**/site-kit-current/
+**/*site-kit*.zip
+**/*SITE-HQ*.zip
+**/*direct*.zip
+**/*Direct*.zip
+
+# =========================
+# Dependencies / build output
+# =========================
+vendor/
+node_modules/
+laravel/vendor/
+laravel/node_modules/
+laravel/public/build/
+laravel/.phpunit.cache/
+
+# =========================
+# Logs / temp / editor files
+# =========================
+*.log
+*.tmp
+*.bak
+*.old
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Secrets / tokens / credentials
+# =========================
+**/*token*.json
+**/*tokens*.json
+**/*secret*.json
+**/*secrets*.json
+**/*credential*.json
+**/*credentials*.json
+**/*google*.json
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+
+# Real local/pilot profiles may contain live URLs/tokens
+deployment/profiles/*.pilot.json
+!deployment/profiles/*.pilot.example.json
