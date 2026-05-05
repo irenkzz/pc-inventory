@@ -201,7 +201,7 @@ class CollectorApiTest extends TestCase
 
     public function test_collector_csv_intake_continues_without_upload_id(): void
     {
-        $csv = (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv'));
+        $csv = (string) $this->fixtureContents('sample_data/sample_scan_1.csv');
         $file = UploadedFile::fake()->createWithContent('scan.csv', $csv);
 
         $this->post('/api/collector/intake/csv', [

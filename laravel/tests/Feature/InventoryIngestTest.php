@@ -22,8 +22,8 @@ class InventoryIngestTest extends TestCase
         Storage::fake('local');
 
         $ingest = app(InventoryIngestService::class);
-        $first = file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv'));
-        $second = file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_2.csv'));
+        $first = $this->fixtureContents('sample_data/sample_scan_1.csv');
+        $second = $this->fixtureContents('sample_data/sample_scan_2.csv');
 
         $firstResult = $ingest->ingestCsvText((string) $first, 'sample_scan_1.csv', 'test_import');
         $secondResult = $ingest->ingestCsvText((string) $second, 'sample_scan_2.csv', 'test_import');
@@ -64,7 +64,7 @@ class InventoryIngestTest extends TestCase
         Storage::fake('local');
 
         $ingest = app(InventoryIngestService::class);
-        $csv = (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv'));
+        $csv = (string) $this->fixtureContents('sample_data/sample_scan_1.csv');
 
         $created = $ingest->ingestCsvText($csv, 'sample_scan_1.csv', 'test_import');
         $duplicate = $ingest->ingestCsvText($csv, 'sample_scan_1.csv', 'test_import');

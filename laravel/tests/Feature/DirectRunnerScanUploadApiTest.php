@@ -173,7 +173,7 @@ class DirectRunnerScanUploadApiTest extends TestCase
 
     private function sampleCsv(): string
     {
-        return (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv'));
+        return (string) $this->fixtureContents('sample_data/sample_scan_1.csv');
     }
 
     private function file(string $csv): UploadedFile

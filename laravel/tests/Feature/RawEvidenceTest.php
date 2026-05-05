@@ -66,7 +66,7 @@ class RawEvidenceTest extends TestCase
     private function ingestSampleCsv(): void
     {
         app(InventoryIngestService::class)->ingestCsvText(
-            (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv')),
+            (string) $this->fixtureContents('sample_data/sample_scan_1.csv'),
             'sample_scan_1.csv',
             'test_import',
         );

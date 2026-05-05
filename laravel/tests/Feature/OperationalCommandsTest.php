@@ -8,7 +8,9 @@ use App\Models\RunnerCommand;
 use App\Services\Inventory\InventoryIngestService;
 use App\Services\Runner\CommandQueueService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use PDO;
 use Tests\TestCase;
 
 class OperationalCommandsTest extends TestCase
@@ -20,7 +22,7 @@ class OperationalCommandsTest extends TestCase
         Storage::fake('local');
 
         $this->artisan('inventory:simulate-collector', [
-            'csv' => '../../inventaris_py/sample_data/sample_scan_1.csv',
+            'csv' => $this->fixturePath('sample_data/sample_scan_1.csv'),
             '--queue-scan' => true,
             '--ack' => true,
         ])->assertSuccessful();
@@ -138,16 +140,46 @@ class OperationalCommandsTest extends TestCase
         Storage::fake('local');
 
         app(InventoryIngestService::class)->ingestCsvText(
-            (string) file_get_contents(base_path('../../inventaris_py/sample_data/sample_scan_1.csv')),
+            (string) $this->fixtureContents('sample_data/sample_scan_1.csv'),
             'sample_scan_1.csv',
             'test_import',
         );
 
         $this->artisan('inventory:compare-legacy', [
-            'legacy_db' => '../../inventaris_py/data/inventory.db',
+            'legacy_db' => $this->createLegacyDatabaseFixture(),
             '--json' => true,
         ])
             ->expectsOutputToContain('"legacy_table": "devices"')
             ->assertSuccessful();
+    }
+
+    private function createLegacyDatabaseFixture(): string
+    {
+        $path = storage_path('framework/testing/legacy_inventory.db');
+        File::ensureDirectoryExists(dirname($path));
+        File::delete($path);
+
+        $pdo = new PDO('sqlite:' . $path);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        $pdo->exec('create table devices (id integer primary key autoincrement, current_asset_code text, current_user_name text, current_site text, last_seen_at text)');
+        $pdo->exec('insert into devices (current_asset_code, current_user_name, current_site, last_seen_at) values ("LEGACY-001", "legacy-user", "Legacy Site", "2026-04-01 10:00:00")');
+
+        foreach ([
+            'device_identities',
+            'scans',
+            'snapshots',
+            'assignment_history',
+            'change_log',
+            'raw_files',
+            'collector_sites',
+            'collectors',
+            'runners',
+            'runner_commands',
+        ] as $table) {
+            $pdo->exec("create table {$table} (id integer primary key autoincrement)");
+        }
+
+        return $path;
     }
 }
