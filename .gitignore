@@ -97,3 +97,6 @@ laravel/.phpunit.result.cache
 
 # Laravel runtime storage - never commit live runtime contents
 laravel/storage/
+
+# Nested Laravel deployment folder is not canonical source
+laravel/deployment/
