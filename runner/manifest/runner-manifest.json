@@ -1,5 +1,5 @@
 {
-  "runner_version": "1.0.21",
+  "runner_version": "1.0.22",
   "package_folder": "current",
   "recommended_scan_interval_minutes": 240,
   "recommended_runner_poll_interval_minutes": 5
