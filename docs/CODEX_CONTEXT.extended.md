@@ -44,6 +44,7 @@ Current known package/state:
 - Phase 16B read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
 - Phase 16B.1 refined runner triage so old failed commands superseded by later success do not force `ATTENTION`
 - Phase 17A read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
+- Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`
 - collector-share mode remains supported and unaffected
 
 ## Laravel Responsibilities
@@ -266,6 +267,8 @@ Phase 17A Supermicro validation at `D:\inventory\laravel`: `APP_URL=https://inve
 Expected Phase 17A warnings currently include non-production env/debug state, unresolved SQLite production DB decision, pilot/internal hostname, CLI inability to fully prove trusted proxy headers, token rotation UI not done, per-runner token enrollment not done, advanced rate limiting not done, manual Direct HTTPS package refresh/reinstall, larger rollout not validated, production web-server/process/TLS model not finalized, Direct `repair_update` unsupported for Direct HTTPS, and backup policy not verified.
 
 Phase 17A safety: no nested Artisan commands, DB mutation, file writes, cache/config clearing, migrations, runner/collector file access, backup generation, site-kit generation, command triggering, Direct HTTPS API contract changes, command polling/ACK semantic changes, Direct `repair_update` enablement, collector-share behavior changes, or secret printing.
+
+Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`. It is planning/documentation only and does not approve cutover. It keeps SQLite pilot-only, recommends MariaDB/MySQL on Supermicro as the production DB target, recommends IIS + PHP FastCGI for Windows production serving, keeps HPE StoreEasy as TLS termination reverse proxy for now, and requires backup plus restore testing before cutover. It does not change code, runner/collector behavior, API contracts, command semantics, Direct `repair_update`, token UI, production data, `.env`, or generated artifacts.
 
 ## Runner Rename / GUID Behavior
 

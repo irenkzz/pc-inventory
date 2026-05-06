@@ -80,6 +80,8 @@ Phase 17A validation tests: `Tests\Feature\ProductionReadinessCommandTest` passe
 
 Safety: the command does not run nested Artisan commands, mutate DB records, write files, clear cache/config, run migrations, touch runner/collector files, generate backups, generate site kits, trigger commands, change Direct HTTPS API contracts, change command polling/ACK semantics, enable Direct `repair_update`, modify collector-share behavior, or print secrets.
 
+Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`. It keeps Direct HTTPS as the small/no-IT transport, keeps collector-share as the main HQ/multi-PC mode, keeps HPE StoreEasy as TLS termination reverse proxy for now, and documents the recommended production DB/web/TLS/backup model without changing runner, collector, API, command lifecycle, Direct `repair_update`, production data, `.env`, generated artifacts, or secrets.
+
 ## Endpoint And DNS Failures
 
 Use these checks from the runner machine.
