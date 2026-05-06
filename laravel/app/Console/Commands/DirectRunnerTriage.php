@@ -74,7 +74,8 @@ class DirectRunnerTriage extends Command
         $awaitingAckCount = $commands->filter(fn (RunnerCommand $command): bool => $this->isAwaitingAck($command))->count();
         $staleNoAckCount = $commands->filter(fn (RunnerCommand $command): bool => $this->isStaleNoAck($command))->count();
         $failedCount = $commands->filter(fn (RunnerCommand $command): bool => $this->isFailedCommand($command))->count();
-        $likelyStatus = $this->likelyStatus($runner, $commands, $lastUploadAt);
+        $activeFailedStatus = $this->activeFailedStatus($commands);
+        $likelyStatus = $this->likelyStatus($runner, $commands, $lastUploadAt, $activeFailedStatus);
 
         $this->line('Runner');
         $this->line('[INFO] Searched runner ID: ' . $searchedRunnerId);
@@ -97,7 +98,11 @@ class DirectRunnerTriage extends Command
         $this->line('[INFO] Pending queued command count: ' . $pendingCount);
         $this->line('[INFO] Delivered awaiting ACK count: ' . $awaitingAckCount);
         $this->line('[INFO] Stale dispatched/no ACK count: ' . $staleNoAckCount);
-        $this->line('[INFO] Failed command count: ' . $failedCount);
+        $this->line('[INFO] Historical failed command count: ' . $failedCount);
+        $this->line('[INFO] Active/recent unresolved failed command: ' . ($activeFailedStatus === null ? 'no' : 'yes'));
+        if ($failedCount > 0 && $activeFailedStatus === null) {
+            $this->line('[INFO] Historical failed commands appear superseded by a later succeeded command.');
+        }
         $this->line('[INFO] Latest command: ' . ($latestCommand ? $this->latestCommandSummary($latestCommand) : 'No direct commands yet'));
         $this->newLine();
 
@@ -115,7 +120,7 @@ class DirectRunnerTriage extends Command
         $this->line('- Polling means delivery, not execution. ACK is the execution result.');
         $this->newLine();
 
-        $this->line('Result: ' . ($likelyStatus === 'OK' ? 'OK' : 'ATTENTION'));
+        $this->line('Result: ' . ($likelyStatus === 'OK' ? 'PASS' : 'ATTENTION'));
 
         return self::SUCCESS;
     }
@@ -164,18 +169,18 @@ class DirectRunnerTriage extends Command
         ]);
     }
 
-    private function likelyStatus(Runner $runner, Collection $commands, mixed $lastUploadAt): string
+    private function likelyStatus(Runner $runner, Collection $commands, mixed $lastUploadAt, ?string $activeFailedStatus): string
     {
-        if ($commands->contains(fn (RunnerCommand $command): bool => $this->isFailedCommand($command))) {
-            return 'failed command present';
-        }
-
         if ($commands->contains(fn (RunnerCommand $command): bool => $this->isStaleNoAck($command))) {
             return 'stale dispatched/no ACK';
         }
 
         if ($commands->contains(fn (RunnerCommand $command): bool => $this->isAwaitingAck($command))) {
             return 'command awaiting ACK';
+        }
+
+        if ($activeFailedStatus !== null) {
+            return $activeFailedStatus;
         }
 
         $heartbeatAt = $runner->last_direct_heartbeat_at ?: $runner->last_seen_at;
@@ -198,6 +203,9 @@ class DirectRunnerTriage extends Command
     {
         return match ($status) {
             'failed command present' => [
+                'Review latest command status and runner logs without payloads or secrets.',
+            ],
+            'unresolved failed command present' => [
                 'Review latest command status and runner logs without payloads or secrets.',
             ],
             'stale dispatched/no ACK' => [
@@ -245,6 +253,63 @@ class DirectRunnerTriage extends Command
     private function isFailedCommand(RunnerCommand $command): bool
     {
         return $command->status === 'failed' || $command->completion_status === 'failed';
+    }
+
+    private function activeFailedStatus(Collection $commands): ?string
+    {
+        $latestCommand = $commands->first();
+        if ($latestCommand instanceof RunnerCommand && $this->isFailedCommand($latestCommand)) {
+            return 'failed command present';
+        }
+
+        $latestSuccessfulCommand = $commands->first(fn (RunnerCommand $command): bool => $this->isSuccessfulCommand($command));
+        $failedCommands = $commands->filter(fn (RunnerCommand $command): bool => $this->isFailedCommand($command));
+
+        if ($failedCommands->isEmpty()) {
+            return null;
+        }
+
+        if (! $latestSuccessfulCommand instanceof RunnerCommand) {
+            return 'unresolved failed command present';
+        }
+
+        foreach ($failedCommands as $failedCommand) {
+            if ($this->commandIsNewerThan($failedCommand, $latestSuccessfulCommand)) {
+                return 'unresolved failed command present';
+            }
+        }
+
+        return null;
+    }
+
+    private function isSuccessfulCommand(RunnerCommand $command): bool
+    {
+        return in_array($command->status, ['succeeded', 'success', 'completed'], true)
+            || in_array($command->completion_status, ['succeeded', 'success', 'completed'], true);
+    }
+
+    private function commandIsNewerThan(RunnerCommand $candidate, RunnerCommand $reference): bool
+    {
+        $candidateTime = $this->commandReferenceTime($candidate);
+        $referenceTime = $this->commandReferenceTime($reference);
+
+        if ($candidateTime !== null && $referenceTime !== null && ! $candidateTime->equalTo($referenceTime)) {
+            return $candidateTime->gt($referenceTime);
+        }
+
+        return (int) $candidate->id > (int) $reference->id;
+    }
+
+    private function commandReferenceTime(RunnerCommand $command): ?CarbonInterface
+    {
+        return $this->asTime(
+            $command->completed_at
+                ?: $command->acknowledged_at
+                ?: $command->delivered_to_runner_at
+                ?: $command->dispatched_at
+                ?: $command->requested_at
+                ?: $command->created_at
+        );
     }
 
     private function olderThanMinutes(mixed $value, int $minutes): bool
