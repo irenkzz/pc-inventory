@@ -27,6 +27,7 @@ php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage IT-ADMIN
 php artisan inventory:direct-runner-triage LAPTOP-I76TA97E
+php artisan inventory:production-readiness
 ```
 
 `inventory:direct-pilot-status` summarizes the Direct HTTPS pilot fleet from Laravel database state.
@@ -41,6 +42,43 @@ Supermicro validation after Phase 16B.1:
 
 - `IT-ADMIN`: runner version `1.0.22`, recent heartbeat, recent direct poll, latest command succeeded, historical failed commands superseded, likely status `OK`, `Result: PASS`.
 - `LAPTOP-I76TA97E`: runner version `1.0.21`, stale heartbeat/poll/upload/ACK, latest command succeeded, likely status `stale/offline`, `Result: ATTENTION`.
+
+`inventory:production-readiness` was completed in Phase 17A. It is a Laravel-only read-only checklist for production/cutover readiness risks before moving beyond pilot mode. It distinguishes pilot readiness, Direct HTTPS small-site readiness, and production/cutover readiness, and explicitly states that passing checks is not production approval or cutover approval. It uses plain text `[OK]`, `[WARN]`, `[FAIL]`, and `[INFO]` output and ends with exactly one result line: `Result: PASS`, `Result: WARN`, or `Result: FAIL`.
+
+The command documents these sections:
+
+- Environment
+- Database
+- HTTPS / Proxy
+- Storage / Evidence
+- Security / Secrets
+- Operational Commands
+- Direct HTTPS Readiness
+- Collector-share Readiness
+- Cutover Blockers
+- Result
+
+Phase 17A Supermicro validation at `D:\inventory\laravel` produced `Result: WARN` with expected current warnings. Validation state included HTTPS `APP_URL` at `https://inventory-pilot.internal.lan`, `APP_ENV=local`, expected `APP_DEBUG=true` warning, SQLite reachable, migrations table reachable, no pending migrations, writable storage/downloads/raw archive/backup paths, recent backup detected, required operational commands registered, Direct HTTPS runner count 2, stale Direct HTTPS runner count 0, Direct HTTPS runners on expected version `1.0.22` count 2, collector-share runner count 36, collector count 3, collector-share supported as the main HQ/multi-PC mode, and Direct `repair_update` still blocked for Direct HTTPS MVP.
+
+Expected current Phase 17A warnings:
+
+- `APP_ENV` is not production.
+- `APP_DEBUG=true` outside production.
+- SQLite production DB decision unresolved.
+- `APP_URL` uses pilot/internal hostname.
+- Trusted proxy / forwarded HTTPS headers cannot be fully proven from CLI.
+- Token rotation UI not done.
+- Per-runner token enrollment not done.
+- Advanced rate limiting not done.
+- Direct HTTPS rollout remains manual package refresh/reinstall.
+- Larger rollout not validated.
+- Production web-server/process/TLS model not finalized.
+- Direct `repair_update` unsupported for Direct HTTPS.
+- Backup policy not verified.
+
+Phase 17A validation tests: `Tests\Feature\ProductionReadinessCommandTest` passed with 16 tests and 61 assertions. The full Laravel test suite previously passed after implementation with 224 tests and 1005 assertions.
+
+Safety: the command does not run nested Artisan commands, mutate DB records, write files, clear cache/config, run migrations, touch runner/collector files, generate backups, generate site kits, trigger commands, change Direct HTTPS API contracts, change command polling/ACK semantics, enable Direct `repair_update`, modify collector-share behavior, or print secrets.
 
 ## Endpoint And DNS Failures
 
