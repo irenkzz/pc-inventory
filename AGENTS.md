@@ -11,7 +11,12 @@ Always-loaded Codex guardrail. Keep this short. Load `PROJECT_CONTEXT.md` or `do
 - Database is authoritative.
 - CSV snapshots are archived evidence, not operational truth.
 - Google Drive is backup/sync only.
-- Current runner package version: `1.0.21`.
+- Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
+- IT-ADMIN development/Codex repo is `D:\xampp\htdocs\inventaris`.
+- Supermicro pulls reviewed Git changes from IT-ADMIN source work.
+- Official packages/site kits are generated only on Supermicro.
+- Direct HTTPS pilot endpoint: `https://inventory-pilot.internal.lan` via HPE StoreEasy HTTPS reverse proxy.
+- Current runner package version: `1.0.22`.
 
 ## Non-Negotiable Rules
 
@@ -89,6 +94,8 @@ Direct HTTPS:
 php artisan migrate
 php artisan migrate:status
 php artisan inventory:doctor
+php artisan inventory:direct-pilot-status
 php artisan inventory:site-tokens --type=all
 php artisan inventory:register-site-token SITE-HQ --type=direct_runner --reveal
 php artisan inventory:build-site-kit --profile=..\deployment\profiles\generated\SITE-HQ.json
+```
