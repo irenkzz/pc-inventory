@@ -95,6 +95,7 @@ php artisan migrate
 php artisan migrate:status
 php artisan inventory:doctor
 php artisan inventory:direct-pilot-status
+php artisan inventory:production-readiness
 php artisan inventory:site-tokens --type=all
 php artisan inventory:register-site-token SITE-HQ --type=direct_runner --reveal
 php artisan inventory:build-site-kit --profile=..\deployment\profiles\generated\SITE-HQ.json

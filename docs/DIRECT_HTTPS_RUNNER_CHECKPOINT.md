@@ -52,6 +52,7 @@ Runner → sends ACK to Laravel
 - Read-only pilot monitor command: `php artisan inventory:direct-pilot-status`
 - Read-only site-kit audit command: `php artisan inventory:direct-site-kit-audit`
 - Read-only runner triage command: `php artisan inventory:direct-runner-triage {runnerId}`
+- Read-only production readiness checklist command: `php artisan inventory:production-readiness`
 - Tests are self-contained with fixtures
 
 ### Runner
@@ -192,6 +193,79 @@ Confirmed command fields:
 - `completion_status=succeeded`
 - `result_upload_id` filled
 
+### Phase 17A - Production Readiness Checklist Command
+
+Command:
+
+```powershell
+php artisan inventory:production-readiness
+```
+
+Status:
+
+- Implemented, validated on Supermicro, documented.
+- Laravel-only read-only Artisan command.
+- Summarizes production/cutover readiness risks before moving beyond pilot mode.
+- Distinguishes pilot readiness, Direct HTTPS small-site readiness, and production/cutover readiness.
+- Explicitly states that passing checks is not production approval or cutover approval.
+- Uses plain text output with `[OK]`, `[WARN]`, `[FAIL]`, and `[INFO]`.
+- Ends with exactly one of `Result: PASS`, `Result: WARN`, or `Result: FAIL`.
+- Does not run nested Artisan commands, mutate DB records, write files, clear cache/config, run migrations, touch runner/collector files, generate backups, generate site kits, trigger commands, change Direct HTTPS API contracts, change command polling/ACK semantics, enable Direct `repair_update`, modify collector-share behavior, or print secrets.
+
+Sections:
+
+- Environment
+- Database
+- HTTPS / Proxy
+- Storage / Evidence
+- Security / Secrets
+- Operational Commands
+- Direct HTTPS Readiness
+- Collector-share Readiness
+- Cutover Blockers
+- Result
+
+Supermicro validation at `D:\inventory\laravel`:
+
+- `APP_URL` is HTTPS: `https://inventory-pilot.internal.lan`.
+- `APP_ENV` is `local`.
+- `APP_DEBUG=true` remains an expected warning.
+- Database driver is SQLite, database is reachable, migrations table is reachable, and no pending migrations were detected.
+- Storage, downloads, raw archive, and backup paths exist and are writable.
+- Recent backup presence was detected.
+- `APP_KEY` presence is reported without printing the value.
+- Site token metadata count is shown without secrets.
+- Required operational commands are registered: `inventory:doctor`, `inventory:direct-pilot-status`, `inventory:direct-site-kit-audit`, and `inventory:direct-runner-triage`.
+- Direct HTTPS runner count: 2.
+- Stale Direct HTTPS runner count: 0.
+- Direct HTTPS runners on expected version `1.0.22` count: 2.
+- Direct `repair_update` remains blocked for Direct HTTPS MVP.
+- Collector-share runner count: 36.
+- Collector count: 3.
+- Collector-share remains supported and remains the main HQ/multi-PC mode.
+- Final result: `WARN`.
+
+Expected current warnings:
+
+- `APP_ENV` is not production.
+- `APP_DEBUG=true` outside production.
+- SQLite production DB decision unresolved.
+- `APP_URL` uses pilot/internal hostname.
+- Trusted proxy / forwarded HTTPS headers cannot be fully proven from CLI.
+- Token rotation UI not done.
+- Per-runner token enrollment not done.
+- Advanced rate limiting not done.
+- Direct HTTPS rollout remains manual package refresh/reinstall.
+- Larger rollout not validated.
+- Production web-server/process/TLS model not finalized.
+- Direct `repair_update` unsupported for Direct HTTPS.
+- Backup policy not verified.
+
+Validation:
+
+- `Tests\Feature\ProductionReadinessCommandTest` passed: 16 tests, 61 assertions.
+- Full Laravel test suite previously passed after implementation: 224 tests, 1005 assertions.
+
 ## Known Limitations
 
 - Direct `repair_update` is not supported yet.
@@ -206,7 +280,8 @@ Confirmed command fields:
 1. Monitor Direct HTTPS pilots with `php artisan inventory:direct-pilot-status`.
 2. Audit generated Direct HTTPS artifacts with `php artisan inventory:direct-site-kit-audit` before installing more pilot runners.
 3. Triage individual Direct HTTPS runners with `php artisan inventory:direct-runner-triage {runnerId}`.
-4. Keep Direct HTTPS rollout focused on small/no-IT sites first.
-5. Plan token rotation UI.
-6. Plan per-runner token enrollment.
-7. Later evaluate direct `repair_update` support.
+4. Run `php artisan inventory:production-readiness` before moving beyond pilot mode.
+5. Keep Direct HTTPS rollout focused on small/no-IT sites first.
+6. Plan token rotation UI.
+7. Plan per-runner token enrollment.
+8. Later evaluate direct `repair_update` support.

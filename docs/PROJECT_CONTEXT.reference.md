@@ -39,6 +39,7 @@ Current implemented state:
 - read-only Direct HTTPS pilot status command exists: `php artisan inventory:direct-pilot-status`
 - read-only Direct HTTPS site-kit audit command exists: `php artisan inventory:direct-site-kit-audit`
 - read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
+- read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
 - generated site kit and branch package include bundled `smartctl.exe` support for best-effort SSD health/TBW probing
 - per-disk storage health observations and risk scoring are implemented in Laravel
 - storage health has its own portal dashboard and is also surfaced on device detail pages and the main dashboard
@@ -115,6 +116,7 @@ Implemented surface includes:
   - doctor checks
   - collector diagnostics
   - Direct HTTPS pilot status, site-kit audit, and runner triage
+  - production readiness checklist
   - site-token management
   - site profile preparation and validation
   - site-kit building
@@ -416,6 +418,7 @@ Current read-only Direct HTTPS operational command set:
 php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage {runnerId}
+php artisan inventory:production-readiness
 ```
 
 `inventory:direct-site-kit-audit` was completed in Phase 16A and validated on Supermicro. It audits generated Direct HTTPS site-kit artifacts for safe pilot use, including Direct HTTPS transport, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction. It passed with an acceptable `WARN` because `collectorName` is present but is not required for Direct HTTPS active transport.
@@ -428,6 +431,78 @@ Observed Supermicro validation after Phase 16B.1:
 
 - `IT-ADMIN`: runner version `1.0.22`, recent heartbeat, recent direct poll, latest command succeeded, historical failed commands superseded, likely status `OK`, `Result: PASS`.
 - `LAPTOP-I76TA97E`: runner version `1.0.21`, stale heartbeat/poll/upload/ACK, latest command succeeded, likely status `stale/offline`, `Result: ATTENTION`.
+
+Phase 17A `inventory:production-readiness` is implemented, validated on Supermicro, and documented. It is a Laravel-only read-only Artisan command that summarizes production/cutover readiness risks before moving beyond pilot mode. It distinguishes pilot readiness, Direct HTTPS small-site readiness, and production/cutover readiness, and explicitly states that passing checks is not production approval or cutover approval. Output is plain text with `[OK]`, `[WARN]`, `[FAIL]`, and `[INFO]`, and ends with exactly one result line: `Result: PASS`, `Result: WARN`, or `Result: FAIL`.
+
+Phase 17A command sections:
+
+- Environment
+- Database
+- HTTPS / Proxy
+- Storage / Evidence
+- Security / Secrets
+- Operational Commands
+- Direct HTTPS Readiness
+- Collector-share Readiness
+- Cutover Blockers
+- Result
+
+Phase 17A safety:
+
+- Does not run nested Artisan commands.
+- Does not mutate DB records.
+- Does not write files.
+- Does not clear cache/config.
+- Does not run migrations.
+- Does not touch runner or collector files.
+- Does not generate backups or site kits.
+- Does not trigger commands.
+- Does not change Direct HTTPS API contracts.
+- Does not change command polling/ACK semantics.
+- Does not enable Direct `repair_update`.
+- Does not modify collector-share behavior.
+- Does not print secrets.
+
+Phase 17A Supermicro validation at `D:\inventory\laravel`:
+
+- `APP_URL` is HTTPS: `https://inventory-pilot.internal.lan`.
+- `APP_ENV` is `local`.
+- `APP_DEBUG=true` remains an expected warning.
+- Database driver is SQLite, database is reachable, migrations table is reachable, and no pending migrations were detected.
+- Storage, downloads, raw archive, and backup paths exist and are writable.
+- Recent backup presence was detected.
+- `APP_KEY` presence is reported without printing the value.
+- Site token metadata count is shown without secrets.
+- Required operational commands are registered: `inventory:doctor`, `inventory:direct-pilot-status`, `inventory:direct-site-kit-audit`, and `inventory:direct-runner-triage`.
+- Direct HTTPS runner count: 2.
+- Stale Direct HTTPS runner count: 0.
+- Direct HTTPS runners on expected version `1.0.22` count: 2.
+- Direct `repair_update` remains blocked for Direct HTTPS MVP.
+- Collector-share runner count: 36.
+- Collector count: 3.
+- Collector-share remains supported and remains the main HQ/multi-PC mode.
+- Final result: `WARN`.
+
+Expected Phase 17A warnings currently shown:
+
+- `APP_ENV` is not production.
+- `APP_DEBUG=true` outside production.
+- SQLite production DB decision unresolved.
+- `APP_URL` uses pilot/internal hostname.
+- Trusted proxy / forwarded HTTPS headers cannot be fully proven from CLI.
+- Token rotation UI not done.
+- Per-runner token enrollment not done.
+- Advanced rate limiting not done.
+- Direct HTTPS rollout remains manual package refresh/reinstall.
+- Larger rollout not validated.
+- Production web-server/process/TLS model not finalized.
+- Direct `repair_update` unsupported for Direct HTTPS.
+- Backup policy not verified.
+
+Phase 17A tests:
+
+- `Tests\Feature\ProductionReadinessCommandTest` passed: 16 tests, 61 assertions.
+- Full Laravel test suite previously passed after implementation: 224 tests, 1005 assertions.
 
 Operational safety notes:
 
@@ -565,13 +640,14 @@ Still operationally sensitive:
 
 1. run `php artisan inventory:doctor`
 2. run `php artisan inventory:doctor --production` before cutover
-3. keep backups of:
+3. run `php artisan inventory:production-readiness` before moving beyond pilot mode
+4. keep backups of:
    - Laravel DB
    - raw archives
    - generated downloads/site kits
    - site tokens
    - legacy DB
-4. freeze legacy writes before final parity/cutover if full migration is performed
+5. freeze legacy writes before final parity/cutover if full migration is performed
 
 ## Useful Laravel Commands
 
@@ -584,6 +660,7 @@ php artisan inventory:doctor
 php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage IT-ADMIN
+php artisan inventory:production-readiness
 php artisan inventory:import-folder ..\..\inventaris_py\sample_data
 php artisan inventory:compare-legacy ..\..\inventaris_py\data\inventory.db
 php artisan inventory:register-site-token SITE-HQ

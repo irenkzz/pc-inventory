@@ -43,6 +43,7 @@ Current known package/state:
 - Phase 16A read-only Direct HTTPS site-kit audit command exists: `php artisan inventory:direct-site-kit-audit`
 - Phase 16B read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
 - Phase 16B.1 refined runner triage so old failed commands superseded by later success do not force `ATTENTION`
+- Phase 17A read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
 - collector-share mode remains supported and unaffected
 
 ## Laravel Responsibilities
@@ -236,6 +237,7 @@ Current Direct HTTPS operational command set:
 php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage {runnerId}
+php artisan inventory:production-readiness
 ```
 
 Phase 16A `inventory:direct-site-kit-audit` is read-only and was validated on Supermicro. It audits generated Direct HTTPS site-kit artifacts for transport mode, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction. The Supermicro audit passed with an acceptable `WARN` because `collectorName` is present but not required for Direct HTTPS active transport.
@@ -243,6 +245,27 @@ Phase 16A `inventory:direct-site-kit-audit` is read-only and was validated on Su
 Phase 16B `inventory:direct-runner-triage {runnerId}` is read-only and was validated on Supermicro. It triages one Direct HTTPS runner from database state, prints masked identity and timestamp/command summaries, skips collector-share runners safely, and avoids printing tokens, bearer values, token hashes, full configs, raw CSV, command payload JSON, or full runner GUIDs.
 
 Phase 16B.1 keeps historical failed commands visible while preventing old failures superseded by a later succeeded command from forcing `ATTENTION`. Active or recent unresolved failed commands still trigger `ATTENTION`. Supermicro targeted validation passed with 17 tests and 91 assertions. `IT-ADMIN` reports `OK`/`PASS` when heartbeat and poll are fresh and the latest command succeeded; `LAPTOP-I76TA97E` still reports `stale/offline`/`ATTENTION` when stale.
+
+Phase 17A `inventory:production-readiness` is implemented, validated on Supermicro, and documented. It is a Laravel-only read-only Artisan command that summarizes production/cutover readiness risks before moving beyond pilot mode. It distinguishes pilot readiness, Direct HTTPS small-site readiness, and production/cutover readiness, and explicitly states that passing checks is not production approval or cutover approval. Output is plain text with `[OK]`, `[WARN]`, `[FAIL]`, and `[INFO]`, and ends with exactly one result line: `Result: PASS`, `Result: WARN`, or `Result: FAIL`.
+
+Phase 17A sections:
+
+- Environment
+- Database
+- HTTPS / Proxy
+- Storage / Evidence
+- Security / Secrets
+- Operational Commands
+- Direct HTTPS Readiness
+- Collector-share Readiness
+- Cutover Blockers
+- Result
+
+Phase 17A Supermicro validation at `D:\inventory\laravel`: `APP_URL=https://inventory-pilot.internal.lan`, `APP_ENV=local`, `APP_DEBUG=true` warning expected, SQLite reachable, migrations table reachable, no pending migrations, storage/downloads/raw archive/backup paths writable, recent backup detected, required operational commands registered, Direct HTTPS runner count 2, stale Direct HTTPS runner count 0, Direct HTTPS runners on `1.0.22` count 2, collector-share runner count 36, collector count 3, Direct `repair_update` blocked, final result `WARN`.
+
+Expected Phase 17A warnings currently include non-production env/debug state, unresolved SQLite production DB decision, pilot/internal hostname, CLI inability to fully prove trusted proxy headers, token rotation UI not done, per-runner token enrollment not done, advanced rate limiting not done, manual Direct HTTPS package refresh/reinstall, larger rollout not validated, production web-server/process/TLS model not finalized, Direct `repair_update` unsupported for Direct HTTPS, and backup policy not verified.
+
+Phase 17A safety: no nested Artisan commands, DB mutation, file writes, cache/config clearing, migrations, runner/collector file access, backup generation, site-kit generation, command triggering, Direct HTTPS API contract changes, command polling/ACK semantic changes, Direct `repair_update` enablement, collector-share behavior changes, or secret printing.
 
 ## Runner Rename / GUID Behavior
 
@@ -307,6 +330,7 @@ php artisan inventory:doctor --production
 php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage IT-ADMIN
+php artisan inventory:production-readiness
 php artisan inventory:import-folder ..\..\inventaris_py\sample_data
 php artisan inventory:compare-legacy ..\..\inventaris_py\data\inventory.db
 php artisan inventory:register-site-token SITE-HQ
