@@ -41,6 +41,7 @@ Current implemented state:
 - read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
 - read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
 - Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`
+- Phase 18A installation productization strategy is documented in `docs/INSTALLATION_PRODUCTIZATION_STRATEGY.md`
 - generated site kit and branch package include bundled `smartctl.exe` support for best-effort SSD health/TBW probing
 - per-disk storage health observations and risk scoring are implemented in Laravel
 - storage health has its own portal dashboard and is also surfaced on device detail pages and the main dashboard
