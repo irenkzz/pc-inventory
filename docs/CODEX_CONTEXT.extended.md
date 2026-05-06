@@ -30,9 +30,20 @@ Implemented or materially present:
 - legacy comparison tooling
 
 Current known package/state:
-- live runner package: `1.0.21`
-- generated `SITE-HQ` site kit exists
+- active Laravel app: Supermicro at `D:\inventory\laravel`
+- IT-ADMIN development/Codex repo: `D:\xampp\htdocs\inventaris`
+- Git workflow: IT-ADMIN prepares source changes; Supermicro pulls reviewed changes
+- official packages/site kits are generated only on Supermicro
+- Direct HTTPS endpoint: `https://inventory-pilot.internal.lan` through HPE StoreEasy HTTPS reverse proxy to Laravel on Supermicro
+- Direct HTTPS second pilot passed
+- live runner package: `1.0.22`
 - runner package includes `smartctl.exe`, `drivedb.h`, and smartmontools license/readme files
+- runner `1.0.22` includes Direct HTTPS local outbox cleanup
+- IT-ADMIN validated runner `1.0.22` with scheduled task `LastTaskResult=0`, HTTPS health, heartbeat, poll, upload, and cleanup logs
+- Phase 16A read-only Direct HTTPS site-kit audit command exists: `php artisan inventory:direct-site-kit-audit`
+- Phase 16B read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
+- Phase 16B.1 refined runner triage so old failed commands superseded by later success do not force `ATTENTION`
+- collector-share mode remains supported and unaffected
 
 ## Laravel Responsibilities
 
@@ -213,6 +224,26 @@ Flow:
 
 Manual scan and repair/update are asynchronous. Collector participates twice: delivery and result/ack relay.
 
+Direct HTTPS commands are also asynchronous:
+
+- polling means delivery, not execution
+- ACK is the execution result
+- Direct `repair_update` remains blocked for Direct HTTPS MVP
+
+Current Direct HTTPS operational command set:
+
+```powershell
+php artisan inventory:direct-pilot-status
+php artisan inventory:direct-site-kit-audit
+php artisan inventory:direct-runner-triage {runnerId}
+```
+
+Phase 16A `inventory:direct-site-kit-audit` is read-only and was validated on Supermicro. It audits generated Direct HTTPS site-kit artifacts for transport mode, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction. The Supermicro audit passed with an acceptable `WARN` because `collectorName` is present but not required for Direct HTTPS active transport.
+
+Phase 16B `inventory:direct-runner-triage {runnerId}` is read-only and was validated on Supermicro. It triages one Direct HTTPS runner from database state, prints masked identity and timestamp/command summaries, skips collector-share runners safely, and avoids printing tokens, bearer values, token hashes, full configs, raw CSV, command payload JSON, or full runner GUIDs.
+
+Phase 16B.1 keeps historical failed commands visible while preventing old failures superseded by a later succeeded command from forcing `ATTENTION`. Active or recent unresolved failed commands still trigger `ATTENTION`. Supermicro targeted validation passed with 17 tests and 91 assertions. `IT-ADMIN` reports `OK`/`PASS` when heartbeat and poll are fresh and the latest command succeeded; `LAPTOP-I76TA97E` still reports `stale/offline`/`ATTENTION` when stale.
+
 ## Runner Rename / GUID Behavior
 
 Older runner IDs may follow Windows hostname. If a PC is renamed, Laravel can show old/new runner rows even if device inventory still matches the same hardware.
@@ -273,6 +304,9 @@ php artisan --version
 php artisan migrate
 php artisan inventory:doctor
 php artisan inventory:doctor --production
+php artisan inventory:direct-pilot-status
+php artisan inventory:direct-site-kit-audit
+php artisan inventory:direct-runner-triage IT-ADMIN
 php artisan inventory:import-folder ..\..\inventaris_py\sample_data
 php artisan inventory:compare-legacy ..\..\inventaris_py\data\inventory.db
 php artisan inventory:register-site-token SITE-HQ
@@ -297,7 +331,9 @@ Be explicit and conservative when touching:
 
 Known open items:
 - SQLite is acceptable for local development/pilot, but long-term production DB choice is not finalized
-- production web-server/process model is not finalized
-- production TLS approach is not finalized
+- Direct `repair_update` remains blocked for Direct HTTPS MVP
+- Direct HTTPS package/site-kit rollout is still manual refresh/reinstall for now
+- token rotation UI is not done
+- per-runner token enrollment is not done
 - some SSD telemetry gaps are expected on RAID/RST-backed clients
 - software license management, endpoint management, and remote support are out of scope unless explicitly added

@@ -18,14 +18,27 @@ The agreed architecture is still the same:
 
 ## Current State Summary
 
-As of April 30, 2026, the Laravel 10 port is the active central application and is materially beyond scaffolding.
+As of May 6, 2026, the Laravel 10 port is the active central application and is materially beyond scaffolding.
+
+Deployment/source-of-truth state:
+
+- Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
+- IT-ADMIN development/Codex repo is `D:\xampp\htdocs\inventaris`.
+- Git workflow is established: IT-ADMIN prepares source changes, Supermicro pulls reviewed changes.
+- Official site kits/packages are generated only on Supermicro.
+- Direct HTTPS endpoint is active at `https://inventory-pilot.internal.lan` through HPE StoreEasy HTTPS reverse proxy to Laravel on Supermicro.
 
 Current implemented state:
 
 - Laravel admin portal is running
 - collector intake and runner heartbeat flows are working
 - manual scan command flow is working
-- runner repair/update flow has been reworked multiple times and the live package is now at `1.0.21`
+- runner repair/update flow has been reworked multiple times and the live package is now at `1.0.22`
+- Direct HTTPS second pilot passed
+- Direct HTTPS runner `1.0.22` validated on IT-ADMIN with scheduled task `LastTaskResult=0`, HTTPS health, heartbeat, poll, upload, and cleanup logs
+- read-only Direct HTTPS pilot status command exists: `php artisan inventory:direct-pilot-status`
+- read-only Direct HTTPS site-kit audit command exists: `php artisan inventory:direct-site-kit-audit`
+- read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
 - generated site kit and branch package include bundled `smartctl.exe` support for best-effort SSD health/TBW probing
 - per-disk storage health observations and risk scoring are implemented in Laravel
 - storage health has its own portal dashboard and is also surfaced on device detail pages and the main dashboard
@@ -101,6 +114,7 @@ Implemented surface includes:
   - backup
   - doctor checks
   - collector diagnostics
+  - Direct HTTPS pilot status, site-kit audit, and runner triage
   - site-token management
   - site profile preparation and validation
   - site-kit building
@@ -140,7 +154,12 @@ Current runner behavior notes:
 - normal runner execution is designed around current-user scheduled-task mode for share access
 - hidden launcher support exists to avoid visible PowerShell windows during normal scheduled execution
 - update flow is separate from normal scan flow and has gone through several fixes
-- live package version is currently `1.0.21`
+- live package version is currently `1.0.22`
+- Direct HTTPS local outbox cleanup runs only in `direct_https`
+- Direct HTTPS cleanup never deletes `outbox/pending`
+- Direct HTTPS `outbox/sent` cleanup deletes only files older than 14 days and outside newest 100
+- Direct HTTPS `outbox/failed` cleanup deletes only files older than 30 days and outside newest 100
+- Direct HTTPS cleanup logs summaries and warning-only failures do not fail the runner cycle
 
 ### Branch Collector / Relay
 
@@ -182,8 +201,8 @@ Deployment support currently includes:
 
 Important current package state:
 
-- generated site kit for `SITE-HQ` exists
-- branch package contains runner `1.0.21`
+- official generated site kits/packages are produced only on Supermicro
+- branch package contains runner `1.0.22`
 - runner package includes bundled `smartctl.exe`, `drivedb.h`, and smartmontools license/readme files
 
 ### Data And Evidence
@@ -366,7 +385,7 @@ Longer-term rule:
 
 Current known live package version:
 
-- `1.0.21`
+- `1.0.22`
 
 This package includes:
 
@@ -376,12 +395,51 @@ This package includes:
 - stable generated/preserved runner GUID for hostname-change reconciliation
 - bundled smartmontools files for best-effort SSD telemetry
 - site-kit/current package updates on the branch share
+- Direct HTTPS local outbox cleanup:
+  - pending is never deleted
+  - sent cleanup is older than 14 days and outside newest 100
+  - failed cleanup is older than 30 days and outside newest 100
+  - cleanup only runs in `direct_https`
+  - cleanup logs summary and does not fail the runner cycle
 
 Practical status of update flow:
 
 - healthy runners already on the corrected model should be able to use `repair/update`
 - badly broken or historically mis-permissioned installs may still require one corrective reinstall
 - some older machines may have ACL/task-state baggage that makes portal self-repair unreliable until corrected once locally
+
+## Direct HTTPS Operational Commands
+
+Current read-only Direct HTTPS operational command set:
+
+```powershell
+php artisan inventory:direct-pilot-status
+php artisan inventory:direct-site-kit-audit
+php artisan inventory:direct-runner-triage {runnerId}
+```
+
+`inventory:direct-site-kit-audit` was completed in Phase 16A and validated on Supermicro. It audits generated Direct HTTPS site-kit artifacts for safe pilot use, including Direct HTTPS transport, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction. It passed with an acceptable `WARN` because `collectorName` is present but is not required for Direct HTTPS active transport.
+
+`inventory:direct-runner-triage {runnerId}` was completed in Phase 16B and validated on Supermicro. It triages one Direct HTTPS runner from database state and prints environment details, runner identity, masked GUID, timestamps, command counts, latest command summary, likely status, and safe next checks. It skips collector-share runners safely.
+
+Phase 16B.1 refined runner triage failed-history behavior. Historical failed commands remain visible, but old failed commands superseded by a later succeeded command no longer force `ATTENTION`. Active or recent unresolved failed commands still trigger `ATTENTION`. Supermicro targeted validation passed with 17 tests and 91 assertions.
+
+Observed Supermicro validation after Phase 16B.1:
+
+- `IT-ADMIN`: runner version `1.0.22`, recent heartbeat, recent direct poll, latest command succeeded, historical failed commands superseded, likely status `OK`, `Result: PASS`.
+- `LAPTOP-I76TA97E`: runner version `1.0.21`, stale heartbeat/poll/upload/ACK, latest command succeeded, likely status `stale/offline`, `Result: ATTENTION`.
+
+Operational safety notes:
+
+- Direct HTTPS remains a second transport for small/no-IT sites.
+- Collector-share remains supported and unaffected.
+- Direct `repair_update` remains blocked for Direct HTTPS MVP.
+- Commands are asynchronous: polling means delivery, ACK is execution result.
+- Database is authoritative.
+- CSV files are archived evidence only.
+- Google Drive is backup/sync only.
+- Official site kits/packages are generated only on Supermicro.
+- Do not print token secrets, bearer tokens, token hashes, DB credentials, Google credentials, raw CSV contents, command payload JSON, or full runner GUIDs.
 
 ## SSD Telemetry / TBW Context
 
@@ -523,6 +581,9 @@ Run from `laravel/`:
 php artisan --version
 php artisan migrate
 php artisan inventory:doctor
+php artisan inventory:direct-pilot-status
+php artisan inventory:direct-site-kit-audit
+php artisan inventory:direct-runner-triage IT-ADMIN
 php artisan inventory:import-folder ..\..\inventaris_py\sample_data
 php artisan inventory:compare-legacy ..\..\inventaris_py\data\inventory.db
 php artisan inventory:register-site-token SITE-HQ
@@ -536,8 +597,10 @@ php artisan inventory:backup --label=pre-cutover
 ## Assumptions / Known Open Questions
 
 - SQLite is still acceptable for local development and pilot, but long-term production DB choice is not finalized.
-- real production web-server/process model is not finalized.
-- real production TLS approach is not finalized.
+- Direct `repair_update` remains blocked for Direct HTTPS MVP.
+- Direct HTTPS rollout remains manual package refresh/reinstall for now.
+- token rotation UI is still not done.
+- per-runner token enrollment is still not done.
 - some SSD telemetry gaps are expected on RAID/RST-backed clients.
 - if the organization wants fleet-wide reliable TBW beyond best effort, a deeper storage telemetry tool or vendor-specific approach may be required.
 - Google Drive remains backup/sync only, not operational source of truth.
