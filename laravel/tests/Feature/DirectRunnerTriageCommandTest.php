@@ -33,8 +33,48 @@ class DirectRunnerTriageCommandTest extends TestCase
         $this->assertStringContainsString('Runner version: 1.0.22', $output);
         $this->assertStringContainsString('Runner GUID: present ending 4D21', $output);
         $this->assertStringContainsString('[STATUS] OK', $output);
-        $this->assertStringContainsString('Result: OK', $output);
+        $this->assertStringContainsString('Historical failed command count: 0', $output);
+        $this->assertStringContainsString('Active/recent unresolved failed command: no', $output);
+        $this->assertStringContainsString('Result: PASS', $output);
         $this->assertStringNotContainsString('8c2c8c70-1111-4f24-9b10-1f5a3e3d4d21', $output);
+    }
+
+    public function test_healthy_direct_https_runner_with_old_failed_commands_returns_pass_with_history_note(): void
+    {
+        $this->travelTo('2026-05-06 12:00:00');
+        $runner = $this->directRunner([
+            'last_direct_heartbeat_at' => now()->subMinutes(5),
+            'last_direct_poll_at' => now()->subMinutes(4),
+            'last_direct_upload_at' => now()->subHours(2),
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'failed',
+            'requested_at' => now()->subHours(3),
+            'acknowledged_at' => now()->subHours(3)->addMinute(),
+            'completed_at' => now()->subHours(3)->addMinute(),
+            'completion_status' => 'failed',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'succeeded',
+            'requested_at' => now()->subMinutes(10),
+            'acknowledged_at' => now()->subMinutes(9),
+            'completed_at' => now()->subMinutes(9),
+            'completion_status' => 'succeeded',
+            'result_upload_id' => 'upload-result-later',
+        ]);
+
+        [$exitCode, $output] = $this->runCommand('IT-ADMIN');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Historical failed command count: 1', $output);
+        $this->assertStringContainsString('Active/recent unresolved failed command: no', $output);
+        $this->assertStringContainsString('Historical failed commands appear superseded by a later succeeded command.', $output);
+        $this->assertStringContainsString('[STATUS] OK', $output);
+        $this->assertStringContainsString('Result: PASS', $output);
     }
 
     public function test_runner_not_found_returns_fail_without_exception_trace(): void
@@ -211,10 +251,173 @@ class DirectRunnerTriageCommandTest extends TestCase
         [$exitCode, $output] = $this->runCommand('IT-ADMIN');
 
         $this->assertSame(0, $exitCode);
-        $this->assertStringContainsString('Failed command count: 1', $output);
+        $this->assertStringContainsString('Historical failed command count: 1', $output);
+        $this->assertStringContainsString('Active/recent unresolved failed command: yes', $output);
         $this->assertStringContainsString('[STATUS] failed command present', $output);
+        $this->assertStringContainsString('Result: ATTENTION', $output);
         $this->assertStringContainsString('result_upload_id present', $output);
         $this->assertStringContainsString('Review latest command status and runner logs without payloads or secrets.', $output);
+    }
+
+    public function test_failed_command_newer_than_latest_succeeded_command_returns_attention(): void
+    {
+        $runner = $this->directRunner([
+            'last_direct_heartbeat_at' => now(),
+            'last_direct_poll_at' => now(),
+            'last_direct_upload_at' => now(),
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'succeeded',
+            'requested_at' => now()->subMinutes(20),
+            'acknowledged_at' => now()->subMinutes(19),
+            'completed_at' => now()->subMinutes(19),
+            'completion_status' => 'succeeded',
+            'result_upload_id' => 'upload-result-success',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'failed',
+            'requested_at' => now()->subMinutes(10),
+            'acknowledged_at' => now()->subMinutes(9),
+            'completed_at' => now()->subMinutes(9),
+            'completion_status' => 'failed',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'pending',
+            'requested_at' => now()->subMinute(),
+        ]);
+
+        [$exitCode, $output] = $this->runCommand('IT-ADMIN');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Historical failed command count: 1', $output);
+        $this->assertStringContainsString('Active/recent unresolved failed command: yes', $output);
+        $this->assertStringContainsString('[STATUS] unresolved failed command present', $output);
+        $this->assertStringContainsString('Result: ATTENTION', $output);
+    }
+
+    public function test_stale_dispatched_no_ack_outranks_failed_history_note(): void
+    {
+        $runner = $this->directRunner([
+            'last_direct_heartbeat_at' => now(),
+            'last_direct_poll_at' => now(),
+            'last_direct_upload_at' => now(),
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'failed',
+            'requested_at' => now()->subHours(3),
+            'acknowledged_at' => now()->subHours(3)->addMinute(),
+            'completed_at' => now()->subHours(3)->addMinute(),
+            'completion_status' => 'failed',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'succeeded',
+            'requested_at' => now()->subHours(2),
+            'acknowledged_at' => now()->subHours(2)->addMinute(),
+            'completed_at' => now()->subHours(2)->addMinute(),
+            'completion_status' => 'succeeded',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'dispatched',
+            'requested_at' => now()->subMinutes(45),
+            'dispatched_at' => now()->subMinutes(45),
+            'delivered_to_runner_at' => now()->subMinutes(45),
+        ]);
+
+        [$exitCode, $output] = $this->runCommand('IT-ADMIN');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Historical failed commands appear superseded by a later succeeded command.', $output);
+        $this->assertStringContainsString('[STATUS] stale dispatched/no ACK', $output);
+        $this->assertStringContainsString('Result: ATTENTION', $output);
+    }
+
+    public function test_delivered_awaiting_ack_outranks_failed_history_note(): void
+    {
+        $runner = $this->directRunner([
+            'last_direct_heartbeat_at' => now(),
+            'last_direct_poll_at' => now(),
+            'last_direct_upload_at' => now(),
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'failed',
+            'requested_at' => now()->subHours(3),
+            'acknowledged_at' => now()->subHours(3)->addMinute(),
+            'completed_at' => now()->subHours(3)->addMinute(),
+            'completion_status' => 'failed',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'succeeded',
+            'requested_at' => now()->subHours(2),
+            'acknowledged_at' => now()->subHours(2)->addMinute(),
+            'completed_at' => now()->subHours(2)->addMinute(),
+            'completion_status' => 'succeeded',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'dispatched',
+            'requested_at' => now()->subMinutes(5),
+            'dispatched_at' => now()->subMinutes(5),
+            'delivered_to_runner_at' => now()->subMinutes(5),
+        ]);
+
+        [$exitCode, $output] = $this->runCommand('IT-ADMIN');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Historical failed commands appear superseded by a later succeeded command.', $output);
+        $this->assertStringContainsString('[STATUS] command awaiting ACK', $output);
+        $this->assertStringContainsString('Result: ATTENTION', $output);
+    }
+
+    public function test_missing_heartbeat_outranks_failed_history_note(): void
+    {
+        $runner = $this->directRunner([
+            'last_direct_heartbeat_at' => null,
+            'last_seen_at' => null,
+            'last_direct_poll_at' => now(),
+            'last_direct_upload_at' => now(),
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'failed',
+            'requested_at' => now()->subHours(3),
+            'acknowledged_at' => now()->subHours(3)->addMinute(),
+            'completed_at' => now()->subHours(3)->addMinute(),
+            'completion_status' => 'failed',
+        ]);
+        RunnerCommand::query()->create([
+            'runner_id' => $runner->runner_id,
+            'command_type' => 'scan_now',
+            'status' => 'succeeded',
+            'requested_at' => now()->subHours(2),
+            'acknowledged_at' => now()->subHours(2)->addMinute(),
+            'completed_at' => now()->subHours(2)->addMinute(),
+            'completion_status' => 'succeeded',
+        ]);
+
+        [$exitCode, $output] = $this->runCommand('IT-ADMIN');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Historical failed commands appear superseded by a later succeeded command.', $output);
+        $this->assertStringContainsString('[STATUS] stale/offline', $output);
+        $this->assertStringContainsString('Result: ATTENTION', $output);
     }
 
     public function test_output_does_not_contain_sensitive_values_or_payloads(): void
