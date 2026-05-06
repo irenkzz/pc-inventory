@@ -9,12 +9,38 @@ Direct HTTPS is the second runner transport for small or no-IT sites. It does no
 ## Quick Safety Rules
 
 - Do not print or paste `siteToken`, collector tokens, direct runner tokens, or other secrets.
+- Do not print bearer tokens, token hashes, DB credentials, Google credentials, raw CSV contents, command payload JSON, full configs, or full runner GUIDs.
 - Do not use a collector token for Direct HTTPS.
 - Do not use plain HTTP for the second-network pilot.
 - Do not disable TLS validation.
 - Do not use `-SkipCertificateCheck`.
 - Do not test or enable direct `repair_update`; it remains blocked for Direct HTTPS MVP.
 - Keep collector-share mode separate and unaffected.
+- Database state is authoritative. CSV files are archived evidence only. Google Drive is backup/sync only.
+
+## Operational Artisan Commands
+
+Run these from the active Laravel host. Official site kits and packages are generated only on Supermicro.
+
+```powershell
+php artisan inventory:direct-pilot-status
+php artisan inventory:direct-site-kit-audit
+php artisan inventory:direct-runner-triage IT-ADMIN
+php artisan inventory:direct-runner-triage LAPTOP-I76TA97E
+```
+
+`inventory:direct-pilot-status` summarizes the Direct HTTPS pilot fleet from Laravel database state.
+
+`inventory:direct-site-kit-audit` was completed in Phase 16A. It is read-only and audits generated Direct HTTPS site-kit artifacts for Direct HTTPS transport, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction. Supermicro validation passed with an acceptable `WARN` because `collectorName` is present but is not required for Direct HTTPS active transport.
+
+`inventory:direct-runner-triage {runnerId}` was completed in Phase 16B. It is read-only and triages one Direct HTTPS runner using Laravel database state. It shows environment, runner identity, masked GUID, timestamps, command counts, latest command summary, likely status, and safe next checks. Collector-share runners are skipped safely.
+
+Phase 16B.1 refined failed-command diagnosis. Historical failed commands remain visible, but old failed commands superseded by a later succeeded command no longer force `ATTENTION`. Active or recent unresolved failed commands still trigger `ATTENTION`.
+
+Supermicro validation after Phase 16B.1:
+
+- `IT-ADMIN`: runner version `1.0.22`, recent heartbeat, recent direct poll, latest command succeeded, historical failed commands superseded, likely status `OK`, `Result: PASS`.
+- `LAPTOP-I76TA97E`: runner version `1.0.21`, stale heartbeat/poll/upload/ACK, latest command succeeded, likely status `stale/offline`, `Result: ATTENTION`.
 
 ## Endpoint And DNS Failures
 

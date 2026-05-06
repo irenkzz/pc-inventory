@@ -28,6 +28,17 @@ Runner → sends ACK to Laravel
 
 ## Implemented
 
+### Current Deployment State
+
+- Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
+- IT-ADMIN development/Codex repo is `D:\xampp\htdocs\inventaris`.
+- Git workflow is established: IT-ADMIN prepares source changes, Supermicro pulls reviewed changes.
+- Official packages and site kits are generated only on Supermicro.
+- Direct HTTPS endpoint is active at `https://inventory-pilot.internal.lan`.
+- HPE StoreEasy terminates HTTPS and reverse-proxies to Laravel on Supermicro.
+- Direct HTTPS second pilot passed.
+- Current runner package version is `1.0.22`.
+
 ### Laravel
 
 - `direct_runner` token type
@@ -38,9 +49,14 @@ Runner → sends ACK to Laravel
 - `POST /api/direct-runner/commands/ack`
 - Direct command redelivery safety for stale dispatched/unacked commands
 - Portal blocks `repair_update` for direct HTTPS runners
+- Read-only pilot monitor command: `php artisan inventory:direct-pilot-status`
+- Read-only site-kit audit command: `php artisan inventory:direct-site-kit-audit`
+- Read-only runner triage command: `php artisan inventory:direct-runner-triage {runnerId}`
+- Tests are self-contained with fixtures
 
 ### Runner
 
+- package version `1.0.22`
 - `transport_mode=direct_https`
 - direct heartbeat
 - direct scan upload
@@ -52,6 +68,15 @@ Runner → sends ACK to Laravel
 - heartbeat failure no longer blocks pending upload/ACK recovery
 - empty poll response `.Count` bug fixed
 - direct mode no longer requires `sharedRoot` or `collectorName`
+- Direct HTTPS local outbox cleanup:
+  - cleanup only runs in `direct_https`
+  - cleanup is constrained under the resolved Direct HTTPS outbox root
+  - `outbox/pending` is never deleted
+  - `outbox/sent` cleanup: older than 14 days and outside newest 100
+  - `outbox/failed` cleanup: older than 30 days and outside newest 100
+  - unknown files are skipped
+  - cleanup logs summary counts
+  - cleanup warnings do not fail the runner cycle
 
 ### Deployment / Site Kit
 
@@ -60,6 +85,7 @@ Runner → sends ACK to Laravel
 - direct HTTPS site-kit generation
 - runner-only direct site kit by default
 - new direct HTTPS sample profile
+- official site-kit/package generation happens only on Supermicro
 
 ## Safety Rules
 
@@ -71,6 +97,8 @@ Runner → sends ACK to Laravel
 - No DB credentials, Google credentials, master secrets, or global tokens in runner config.
 - Direct command polling is at-least-once; commands must tolerate redelivery.
 - Direct `repair_update` is blocked for MVP.
+- Collector-share mode remains supported and unaffected.
+- Do not print token secrets, bearer tokens, token hashes, DB credentials, Google credentials, or raw CSV contents.
 
 ## Validated Pilot Result
 
@@ -84,6 +112,79 @@ Manual test on runner `IT-ADMIN` passed end-to-end:
 - Direct ACK succeeded
 - Laravel command reached `status=succeeded`
 
+Second Direct HTTPS pilot on runner `LAPTOP-I76TA97E` also passed end-to-end:
+
+- HTTPS endpoint through HPE StoreEasy reverse proxy returned 200
+- Direct runner installed successfully
+- Runner appeared in portal
+- Heartbeat populated
+- Direct command poll populated
+- Inventory upload/ingest succeeded
+- Devices list showed laptop inventory
+- Manual scan command delivered, ACKed, and succeeded
+- Portal showed Direct HTTPS Last Inventory and repair/update guardrail correctly after cleanup
+
+Runner package `1.0.22` was validated on IT-ADMIN:
+
+- scheduled task `LastTaskResult=0`
+- HTTPS health OK
+- heartbeat success observed
+- direct poll success observed
+- upload status `direct_upload_uploaded` observed
+- cleanup summary logs observed
+- pending folder had 0 files and was not deleted/touched
+- no cleanup warnings/errors observed
+- collector stayed disabled/not involved
+
+## Phase 16 Operational Commands
+
+### Phase 16A - Direct HTTPS Site-kit Audit
+
+Command:
+
+```powershell
+php artisan inventory:direct-site-kit-audit
+```
+
+Status:
+
+- Completed and validated on Supermicro.
+- Read-only Laravel Artisan command.
+- Audits generated Direct HTTPS site-kit artifacts before installing more Direct HTTPS runners.
+- Checks Direct HTTPS transport, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction.
+- Passed with an acceptable `WARN` because `collectorName` is present in the generated artifact but is not required for Direct HTTPS active transport.
+- Does not generate site kits, rotate tokens, update timestamps, or mutate database records.
+
+### Phase 16B - Direct HTTPS Runner Triage
+
+Command:
+
+```powershell
+php artisan inventory:direct-runner-triage {runnerId}
+```
+
+Status:
+
+- Completed and validated on Supermicro.
+- Read-only Laravel Artisan command.
+- Triage one Direct HTTPS runner from existing Laravel database state.
+- Shows environment, runner identity, masked GUID, Direct HTTPS timestamps, command counts, latest command summary, likely status, and safe next checks.
+- Skips collector-share runners safely and does not warn about missing Direct HTTPS fields for collector-share mode.
+- Does not print payloads, tokens, bearer values, token hashes, full configs, raw CSV, or full runner GUIDs.
+
+### Phase 16B.1 - Failed-History Refinement
+
+Status:
+
+- Completed and validated on Supermicro.
+- Historical failed commands remain visible as informational context.
+- Old failed commands superseded by a later succeeded command no longer force `ATTENTION`.
+- Active or recent unresolved failed commands still trigger `ATTENTION`.
+- Targeted test validation passed: 17 tests, 91 assertions.
+- Supermicro validation:
+  - `IT-ADMIN`: runner version `1.0.22`, recent heartbeat, recent direct poll, latest command succeeded, historical failed commands superseded, likely status `OK`, `Result: PASS`.
+  - `LAPTOP-I76TA97E`: runner version `1.0.21`, stale heartbeat/poll/upload/ACK, latest command succeeded, likely status `stale/offline`, `Result: ATTENTION`.
+
 Confirmed command fields:
 
 - `acknowledged_at` filled
@@ -95,16 +196,17 @@ Confirmed command fields:
 
 - Direct `repair_update` is not supported yet.
 - Token rotation UI is not done.
-- Sent/failed retention cleanup is not done.
 - Advanced rate limiting is not done.
 - Per-runner token enrollment is not done.
-- Portal visibility for direct mode still needs improvement.
+- Direct HTTPS runner rollout is manual package refresh/reinstall for now.
 - Direct mode is intended first for small/no-IT sites, not large branches.
 
 ## Next Recommended Steps
 
-1. Improve portal visibility for direct HTTPS runners.
-2. Add sent/failed retention cleanup policy.
-3. Pilot one more direct HTTPS runner on a different machine/network.
-4. Add direct-mode troubleshooting docs.
-5. Later evaluate direct `repair_update` support.
+1. Monitor Direct HTTPS pilots with `php artisan inventory:direct-pilot-status`.
+2. Audit generated Direct HTTPS artifacts with `php artisan inventory:direct-site-kit-audit` before installing more pilot runners.
+3. Triage individual Direct HTTPS runners with `php artisan inventory:direct-runner-triage {runnerId}`.
+4. Keep Direct HTTPS rollout focused on small/no-IT sites first.
+5. Plan token rotation UI.
+6. Plan per-runner token enrollment.
+7. Later evaluate direct `repair_update` support.
