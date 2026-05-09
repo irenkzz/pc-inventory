@@ -29,6 +29,8 @@ Phase 19F Supermicro validation confirms the rehearsal MariaDB foundation is rea
 
 Phase 19G follow-up: the empty Laravel schema was migrated only into the MariaDB rehearsal database `inventory_rehearsal`; all migrations show `Ran`, with `20` rehearsal tables and an empty restore-test database. This remains rehearsal-only and does not approve app data transfer, live DB driver switching, live `.env` changes, web exposure, runner/collector traffic changes, or production cutover.
 
+Phase 19H follow-up: app-aware transfer planning is documented in `docs/MARIADB_REHEARSAL_TRANSFER_PLAN.md`. This remains planning-only and does not approve transfer execution, restore rehearsal, live DB driver switching, live `.env` changes, package generation, runner/collector traffic changes, or production cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
