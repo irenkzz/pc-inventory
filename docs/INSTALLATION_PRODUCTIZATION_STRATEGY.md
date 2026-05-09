@@ -141,7 +141,9 @@ Phase 18C does not create users, sites, tokens, token rotation, per-runner enrol
 
 ## 8. Future Direct HTTPS Runner Installer Responsibilities
 
-Phase 18D adds the Direct HTTPS Runner Installer MVP at `runner/scripts/install_direct_https_runner.ps1`. It is a conservative PowerShell wrapper, not a full installer framework or GUI. It validates an already generated Direct HTTPS runner config, checks HTTPS `/health` with normal TLS validation, requires elevated PowerShell, backs up an existing installed config before overwrite, delegates file/task installation to `install_runner.ps1`, reapplies Direct HTTPS fields, preserves an existing `runnerGuid`, verifies the Scheduled Task and installed config, writes a local installer log, and prints a redacted support summary plus portal verification steps.
+Phase 18D adds the Direct HTTPS Runner Installer MVP at `runner/scripts/install_direct_https_runner.ps1`. Status: implemented, live-validated with manual Scheduled Task trigger, documented.
+
+It is a conservative PowerShell wrapper, not a full installer framework or GUI. It validates an already generated Direct HTTPS runner config, checks HTTPS `/health` with normal TLS validation, requires elevated PowerShell, backs up an existing installed config before overwrite, delegates file/task installation to `install_runner.ps1`, reapplies Direct HTTPS fields, preserves an existing `runnerGuid`, verifies the Scheduled Task and installed config, writes a local installer log, and prints a redacted support summary plus portal verification steps.
 
 The wrapper refuses collector-share configs, missing or unknown `transport_mode`, plain HTTP, localhost/loopback, example, placeholder, and `inventory.example.local` URLs. It never uses `-SkipCertificateCheck`, does not call Laravel Direct HTTPS heartbeat/upload/poll/ACK/command APIs, does not trigger `scan_now` or `manual_scan`, does not enable Direct `repair_update`, and does not print tokens, raw configs, or full runner GUIDs.
 
@@ -168,7 +170,9 @@ It must not:
 - Disable TLS validation.
 - Change asynchronous command semantics.
 
-Generated Direct HTTPS site kits include the wrapper and the Direct HTTPS runner-only launcher invokes it after local staging and UAC elevation. Collector-share site kits remove the Direct HTTPS-only wrapper from generated runner package contents so collector-share behavior stays unchanged.
+Generated Direct HTTPS site kits include the wrapper and the Direct HTTPS runner-only launcher invokes it after local staging and UAC elevation. The package inclusion is additive. Collector-share package behavior is unchanged, config schema is unchanged, and token handling is unchanged.
+
+Validation passed with the PowerShell parser check, `tests/powershell/Test-DirectHttpsInstaller.ps1`, targeted Laravel package/audit tests, the full Laravel suite after implementation, Supermicro Direct HTTPS site-kit audit with an acceptable `collectorName` warning, Direct HTTPS profile validation for `..\deployment\profiles\site_hq_direct_https.pilot.json`, and live runner validation on `LAPTOP-I76TA97E`. The live validation used one manual Scheduled Task trigger after wrapper install; normal automatic scheduled interval observation can continue during monitoring.
 
 ## 9. Future Collector-site Installer Responsibilities
 
@@ -257,8 +261,8 @@ Support summaries should use redacted labels, partial non-secret identifiers, ti
 - Phase 18A - Installation Productization Strategy. Status: done.
 - Phase 18B - Installer/server preflight command. Status: implemented, validated on Supermicro, documented.
 - Phase 18C - Portal Setup Wizard MVP. Status: implemented, validated on Supermicro, documented.
-- Phase 18D - Direct HTTPS Runner Installer MVP. Status: implemented in source; Supermicro/live runner validation still required after pull.
-- Phase 18E - Collector-site Installer MVP. Status: after 18D.
+- Phase 18D - Direct HTTPS Runner Installer MVP. Status: implemented, live-validated with manual Scheduled Task trigger, documented.
+- Phase 18E - Collector-site Installer MVP. Status: next candidate.
 - Then return to MariaDB migration runbook and rehearsal.
 
 The roadmap intentionally keeps setup productization separate from production database migration and cutover approval.

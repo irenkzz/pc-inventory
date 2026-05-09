@@ -374,7 +374,7 @@ Known open items:
 - SQLite is acceptable for local development/pilot, but long-term production DB choice is not finalized
 - Direct `repair_update` remains blocked for Direct HTTPS MVP
 - Direct HTTPS package/site-kit rollout is still manual refresh/reinstall for now
-- Phase 18D adds `runner/scripts/install_direct_https_runner.ps1`, a Direct HTTPS-only wrapper that validates generated config and HTTPS `/health`, requires admin PowerShell, preserves existing runner GUID, delegates to `install_runner.ps1`, verifies Scheduled Task/config, writes redacted logs, and does not change Direct HTTPS API contracts, command lifecycle, collector behavior, or Direct `repair_update`
+- Phase 18D adds `runner/scripts/install_direct_https_runner.ps1`, a Direct HTTPS-only wrapper that validates generated config and HTTPS `/health`, requires admin PowerShell, preserves existing runner GUID, delegates to `install_runner.ps1`, verifies Scheduled Task/config, writes redacted logs, and does not change Direct HTTPS API contracts, command lifecycle, collector behavior, or Direct `repair_update`; status is implemented, live-validated with manual Scheduled Task trigger on `LAPTOP-I76TA97E`, and documented
 - token rotation UI is not done
 - per-runner token enrollment is not done
 - some SSD telemetry gaps are expected on RAID/RST-backed clients
