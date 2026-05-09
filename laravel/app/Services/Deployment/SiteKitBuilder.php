@@ -69,6 +69,9 @@ class SiteKitBuilder
             File::copyDirectory($sourceRoot . DIRECTORY_SEPARATOR . 'collector', $buildRoot . DIRECTORY_SEPARATOR . 'collector');
         }
         File::deleteDirectory($buildRoot . DIRECTORY_SEPARATOR . 'runner/data');
+        if ($transportMode !== 'direct_https') {
+            File::delete($buildRoot . DIRECTORY_SEPARATOR . 'runner/scripts/install_direct_https_runner.ps1');
+        }
         $this->deleteGeneratedNoise($buildRoot);
 
         $runnerConfig = [
@@ -148,7 +151,11 @@ class SiteKitBuilder
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'START_HERE_INSTALL_COLLECTOR_PC.cmd', $this->siteKitModeCmd('CollectorAndRunner', $siteId) . PHP_EOL);
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_COLLECTOR_ONLY.cmd', $this->siteKitModeCmd('CollectorOnly', $siteId) . PHP_EOL);
         }
-        File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_THIS_PC_RUNNER_ONLY.cmd', $this->siteKitModeCmd('RunnerOnly', $siteId) . PHP_EOL);
+        File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_THIS_PC_RUNNER_ONLY.cmd', (
+            $transportMode === 'direct_https'
+                ? $this->directHttpsRunnerCmd($siteId)
+                : $this->siteKitModeCmd('RunnerOnly', $siteId)
+        ) . PHP_EOL);
         File::put($buildRoot . DIRECTORY_SEPARATOR . 'FORCE_UPDATE_THIS_PC_RUNNER.cmd', $this->forceUpdateCmd('runner') . PHP_EOL);
         if ($collectorEnabled) {
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'branch-share/packages/runner/FORCE_UPDATE_THIS_PC_RUNNER.cmd', $this->forceUpdateCmd('current') . PHP_EOL);
@@ -314,6 +321,36 @@ class SiteKitBuilder
         return $this->stagedSiteKitCmd($siteId, $mode)
             . "echo.\r\n"
             . "echo Installer finished. If there were errors, send install-site-kit.log to IT.\r\n"
+            . "pause\r\n";
+    }
+
+    private function directHttpsRunnerCmd(string $siteId): string
+    {
+        return "@echo off\r\n"
+            . "setlocal\r\n"
+            . "set \"SOURCE=%~dp0\"\r\n"
+            . "set \"STAGE=%PUBLIC%\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
+            . "echo Staging Direct HTTPS runner installer locally...\r\n"
+            . "pushd \"%SOURCE%\"\r\n"
+            . "if errorlevel 1 (\r\n"
+            . "  echo Could not access installer source: %SOURCE%\r\n"
+            . "  pause\r\n"
+            . "  exit /b 1\r\n"
+            . ")\r\n"
+            . "if exist \"%STAGE%\" rmdir /s /q \"%STAGE%\"\r\n"
+            . "mkdir \"%STAGE%\" >nul 2>nul\r\n"
+            . "robocopy \".\" \"%STAGE%\" /MIR /XD data storage vendor node_modules .git /XF install-site-kit.log /R:2 /W:1 >nul\r\n"
+            . "set \"RC=%ERRORLEVEL%\"\r\n"
+            . "popd\r\n"
+            . "if %RC% GEQ 8 (\r\n"
+            . "  echo Could not copy installer locally. Robocopy exit code: %RC%\r\n"
+            . "  pause\r\n"
+            . "  exit /b %RC%\r\n"
+            . ")\r\n"
+            . "cd /d \"%STAGE%\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\runner\\scripts\\install_direct_https_runner.ps1','-ConfigPath','%STAGE%\\runner\\config\\runner-config.template.json','-UseComputerNameAsRunnerId')\"\r\n"
+            . "echo.\r\n"
+            . "echo Direct HTTPS runner installer finished. If there were errors, send the installer log path shown above to IT.\r\n"
             . "pause\r\n";
     }
 

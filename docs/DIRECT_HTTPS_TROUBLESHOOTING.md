@@ -91,6 +91,12 @@ Phase 18B Supermicro validation at `D:\inventory\laravel` produced `Result: WARN
 
 Phase 18B validation tests: `Tests\Feature\InstallPreflightCommandTest` passed with 21 tests and 56 assertions. The full Laravel suite passed after implementation with 245 tests and 1061 assertions.
 
+`/setup-wizard` was completed in Phase 18C. It is an authenticated admin portal page and read-only guided setup MVP for productized setup flow review. It shows the seven-step setup flow, safe `APP_URL` / HTTPS labels, existing site/runner/collector counts only, Direct HTTPS / collector-share / hybrid deployment guidance, links to runners, collectors, command queue, and downloads, verification checklists, and a secret-redaction footer. It references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running them.
+
+Phase 18C safety: the page does not create users, sites, tokens, token rotation, per-runner enrollment, packages, site kits, migrations, `.env` changes, production approval, or production data mutations. It does not touch runner or collector files, change Direct HTTPS API contracts, change command lifecycle semantics, enable Direct `repair_update`, or expose secrets. Collector-share remains supported and unaffected.
+
+Phase 18C validation: `Tests\Feature\SetupWizardMvpTest` passed with 8 tests and 52 assertions; the full Laravel suite passed after implementation with 253 tests and 1113 assertions. Manual portal validation confirmed `/setup-wizard` loads for authenticated admin, is clearly read-only and not production/cutover approval, has understandable Direct HTTPS / collector-share / hybrid guidance, includes verification links, and displays no secrets.
+
 ## Endpoint And DNS Failures
 
 Use these checks from the runner machine.
@@ -339,6 +345,47 @@ Get-ScheduledTask | Where-Object { $_.TaskName -match 'Collector|InventoryCollec
 ```
 
 Do not re-enable collector while validating Direct HTTPS.
+
+## Direct HTTPS Installer MVP
+
+Phase 18D adds `runner/scripts/install_direct_https_runner.ps1` for Direct HTTPS runner packages. Use it only with already generated Direct HTTPS runner configs.
+
+Expected behavior:
+
+- Requires elevated PowerShell.
+- Refuses collector-share or unknown transport configs.
+- Requires `transport_mode=direct_https`.
+- Requires an HTTPS `serverBaseUrl`.
+- Refuses HTTP, localhost, loopback, example, placeholder, and `inventory.example.local` endpoints.
+- Checks `serverBaseUrl + /health` using normal TLS validation.
+- Does not use `-SkipCertificateCheck`.
+- Backs up an existing installed config before overwrite.
+- Preserves existing `runnerGuid` and prints only a redacted suffix.
+- Delegates installation to `install_runner.ps1`.
+- Verifies the Scheduled Task and installed Direct HTTPS config.
+- Writes an installer log under `C:\ProgramData\InternalInventoryRunner\logs` when available, otherwise `%TEMP%`.
+
+Normal install from an extracted Direct HTTPS package:
+
+```text
+INSTALL_THIS_PC_RUNNER_ONLY.cmd
+```
+
+That launcher stages the package locally, asks for administrator approval, and invokes the wrapper with `runner-config.template.json`.
+
+Manual wrapper run from an extracted Direct HTTPS package:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\runner\scripts\install_direct_https_runner.ps1 -ConfigPath .\runner\config\runner-config.template.json -UseComputerNameAsRunnerId
+```
+
+If installation fails after a backup was created, restore by copying the `.bak-YYYYMMDD-HHMMSS` file back to:
+
+```text
+C:\ProgramData\InternalInventoryRunner\config\runner-config.json
+```
+
+Do not paste installer logs that contain raw configs. Support summaries should include only runner ID, transport mode, version, server URL, masked runner GUID suffix, Scheduled Task status, HTTPS health result, and log path.
 
 ## Portal Checklist
 

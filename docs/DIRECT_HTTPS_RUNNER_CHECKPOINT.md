@@ -312,6 +312,80 @@ Validation:
 - `Tests\Feature\InstallPreflightCommandTest` passed: 21 tests, 56 assertions.
 - Full Laravel test suite passed after implementation: 245 tests, 1061 assertions.
 
+### Phase 18C - Portal Setup Wizard MVP
+
+Route:
+
+```text
+GET /setup-wizard
+```
+
+Status:
+
+- Implemented, validated on Supermicro, documented.
+- Authenticated admin portal page.
+- Read-only guided setup MVP, not production/cutover approval.
+- Shows seven-step setup flow, safe `APP_URL` / HTTPS labels, existing site/runner/collector counts only, deployment-mode guidance, verification checklists, and secret-redaction footer.
+- Explains Direct HTTPS, collector-share, and hybrid modes.
+- Links to existing runners, collectors, command queue, and downloads pages.
+- References `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running nested Artisan commands.
+- Adds an Operations navigation link.
+
+Safety:
+
+- Does not create users, sites, tokens, token rotation, per-runner enrollment, packages, site kits, migrations, `.env` changes, production approval, or production data mutations.
+- Does not touch runner files or collector files.
+- Does not change Direct HTTPS API contracts or command lifecycle semantics.
+- Direct `repair_update` remains blocked.
+- Collector-share remains supported and unaffected.
+- No secrets are printed or exposed.
+
+Validation:
+
+- `Tests\Feature\SetupWizardMvpTest` passed: 8 tests, 52 assertions.
+- Full Laravel suite passed after implementation: 253 tests, 1113 assertions.
+- Manual portal validation after merge/pull confirmed `/setup-wizard` loads for authenticated admin, read-only and non-cutover wording are clear, mode cards are understandable, verification links are present, and no secrets are displayed.
+
+### Phase 18D - Direct HTTPS Runner Installer MVP
+
+Script:
+
+```text
+runner/scripts/install_direct_https_runner.ps1
+```
+
+Status:
+
+- Implemented in source; Supermicro package/live-runner validation is still required after reviewed pull.
+- PowerShell wrapper for already generated Direct HTTPS runner packages/configs.
+- Requires elevated PowerShell for MVP.
+- Locates or accepts `runner-config.template.json` / `runner-config.json`.
+- Validates `transport_mode=direct_https` before install.
+- Refuses collector-share, missing, blank, or unknown transport modes.
+- Validates `serverBaseUrl`, requires `https://`, and refuses HTTP, localhost, loopback, example, placeholder, and `inventory.example.local` URLs.
+- Checks `serverBaseUrl + /health` with normal TLS validation and does not use `-SkipCertificateCheck`.
+- Detects and backs up an existing installed config before overwrite.
+- Preserves an existing installed `runnerGuid` and prints only a redacted suffix.
+- Delegates actual file/task installation to `install_runner.ps1`.
+- Verifies the Scheduled Task and installed Direct HTTPS config after install.
+- Writes a local installer log and prints a redacted support summary plus portal verification instructions.
+- Generated Direct HTTPS `INSTALL_THIS_PC_RUNNER_ONLY.cmd` stages locally, elevates with UAC, and invokes the wrapper with `runner-config.template.json`.
+
+Safety:
+
+- Does not change `runner_main.ps1`, scanner behavior, collector behavior, Direct HTTPS API contracts, command lifecycle semantics, or Direct `repair_update`.
+- Does not call Laravel Direct HTTPS heartbeat/upload/poll/ACK/command APIs.
+- Does not trigger `scan_now` or `manual_scan`.
+- Does not print tokens, raw configs, command payloads, `.env` values, `APP_KEY`, or full runner GUIDs.
+- Generated Direct HTTPS site kits include and launch the wrapper; generated collector-share site kits remove the Direct HTTPS-only wrapper.
+
+Validation:
+
+- PowerShell parser check passed for `runner/scripts/install_direct_https_runner.ps1`.
+- `tests/powershell/Test-DirectHttpsInstaller.ps1` passed.
+- `Tests\Feature\SiteProfileValidationCommandTest` passed: 17 tests, 103 assertions.
+- `Tests\Feature\DirectSiteKitAuditCommandTest` passed: 8 tests, 46 assertions.
+
 ## Known Limitations
 
 - Direct `repair_update` is not supported yet.
@@ -329,6 +403,7 @@ Validation:
 4. Run `php artisan inventory:production-readiness` before moving beyond pilot mode.
 5. Run `php artisan inventory:install-preflight` before productized setup/package generation review.
 6. Keep Direct HTTPS rollout focused on small/no-IT sites first.
-7. Plan Phase 18C Portal Setup Wizard MVP.
-8. Plan Phase 18D Direct HTTPS Runner Installer MVP and Phase 18E Collector-site Installer MVP.
-9. Later return to MariaDB migration runbook and rehearsal.
+7. Phase 18C Portal Setup Wizard MVP is done.
+8. Pull reviewed Phase 18D source on Supermicro, run `inventory:install-preflight`, `inventory:direct-site-kit-audit`, and Laravel tests, then validate an official Direct HTTPS test package on a runner PC.
+9. Plan Phase 18E Collector-site Installer MVP.
+10. Later return to MariaDB migration runbook and rehearsal.

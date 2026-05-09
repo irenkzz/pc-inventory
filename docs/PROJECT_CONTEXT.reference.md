@@ -519,7 +519,11 @@ Phase 18B Supermicro validation at `D:\inventory\laravel`: host/path was detecte
 
 Phase 18B tests: `Tests\Feature\InstallPreflightCommandTest` passed with 21 tests and 56 assertions. The full Laravel suite passed after implementation with 245 tests and 1061 assertions.
 
-Phase 18C adds an authenticated read-only Portal Setup Wizard MVP at `/setup-wizard`. It guides the seven-step productized setup flow, references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running nested Artisan commands, shows safe existing site/runner/collector counts, explains Direct HTTPS, collector-share, and hybrid deployment modes, links to existing runners/collectors/commands/downloads verification pages, and repeats redaction rules. It does not create users, organization/company schema, sites, tokens, packages, site kits, backups, migrations, runner commands, or production approval, and it does not change runner/collector behavior, Direct HTTPS API contracts, command lifecycle semantics, `.env`, generated artifacts, or secrets.
+Phase 18C `GET /setup-wizard` is implemented, validated on Supermicro, and documented. It is an authenticated admin portal page and read-only guided setup MVP. It shows the seven-step productized setup flow, safe `APP_URL` / HTTPS labels, existing site/runner/collector counts only, Direct HTTPS / collector-share / hybrid deployment-mode guidance, links to existing runners/collectors/commands/downloads pages, verification checklists, and a secret-redaction footer. It references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running nested Artisan commands, and adds an Operations navigation link.
+
+Phase 18C safety: it does not create users, organization/company schema, sites, tokens, token rotation, per-runner enrollment, packages, site kits, backups, migrations, `.env` changes, production approval, or production data mutations. It does not touch runner/collector files, change Direct HTTPS API contracts, change command lifecycle semantics, enable Direct `repair_update`, or expose secrets. Collector-share remains supported and unaffected.
+
+Phase 18C validation: `Tests\Feature\SetupWizardMvpTest` passed with 8 tests and 52 assertions. The full Laravel suite passed after implementation with 253 tests and 1113 assertions. Manual portal validation after merge/pull confirmed `/setup-wizard` loads for authenticated admin, read-only status and non-cutover wording are clear, Direct HTTPS / collector-share / hybrid modes are understandable, verification links are present, and no secrets are displayed.
 
 Operational safety notes:
 
@@ -612,6 +616,7 @@ Completed or materially implemented:
 - downloadable site-kit generation
 - current-user runner deployment model
 - hidden collector and runner launcher support
+- Direct HTTPS runner installer wrapper MVP
 - SSD telemetry ingestion/display plumbing
 - per-disk storage health ingest, scoring, and portal visibility
 - substantial feature and unit test coverage
@@ -694,7 +699,7 @@ php artisan inventory:backup --label=pre-cutover
 
 - SQLite is still acceptable for local development and pilot, but long-term production DB choice is not finalized.
 - Direct `repair_update` remains blocked for Direct HTTPS MVP.
-- Direct HTTPS rollout remains manual package refresh/reinstall for now.
+- Direct HTTPS rollout remains manual package refresh/reinstall for now; Phase 18D adds a Direct HTTPS installer wrapper but still requires Supermicro package validation and live runner validation after pull.
 - token rotation UI is still not done.
 - per-runner token enrollment is still not done.
 - some SSD telemetry gaps are expected on RAID/RST-backed clients.

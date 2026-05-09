@@ -209,6 +209,7 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertStringContainsString('pushd "%SOURCE%"', $runnerLauncher);
         $this->assertStringContainsString('robocopy "." "%STAGE%"', $runnerLauncher);
         $this->assertStringContainsString('Start-Process powershell.exe -Verb RunAs', $runnerLauncher);
+        $this->assertStringNotContainsString('install_direct_https_runner.ps1', $runnerLauncher);
 
         $installer = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_SITE_KIT.ps1'));
         $this->assertStringContainsString('function Invoke-LoggedCommand', $installer);
@@ -220,6 +221,8 @@ class SiteProfileValidationCommandTest extends TestCase
         $runnerInstaller = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/scripts/install_runner.ps1'));
         $scannerScript = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/scripts/scanner_core_v4.ps1'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/collector/run_collector_hidden.pyw'));
+        $this->assertFileDoesNotExist(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/scripts/install_direct_https_runner.ps1'));
+        $this->assertFileDoesNotExist(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/branch-share/packages/runner/current/scripts/install_direct_https_runner.ps1'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/smartctl.exe'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/drivedb.h'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/COPYING.smartmontools.txt'));
@@ -383,6 +386,19 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertFileDoesNotExist($buildRoot . '/INSTALL_COLLECTOR_ONLY.cmd');
         $this->assertFileDoesNotExist($buildRoot . '/INSTALL_COLLECTOR_COMMAND.txt');
         $this->assertFileExists($buildRoot . '/INSTALL_THIS_PC_RUNNER_ONLY.cmd');
+        $this->assertFileExists($buildRoot . '/runner/scripts/install_direct_https_runner.ps1');
+
+        $directRunnerLauncher = (string) file_get_contents($buildRoot . '/INSTALL_THIS_PC_RUNNER_ONLY.cmd');
+        $this->assertStringContainsString('install_direct_https_runner.ps1', $directRunnerLauncher);
+        $this->assertStringContainsString('runner-config.template.json', $directRunnerLauncher);
+        $this->assertStringContainsString('-UseComputerNameAsRunnerId', $directRunnerLauncher);
+        $this->assertStringNotContainsString('INSTALL_SITE_KIT.ps1', $directRunnerLauncher);
+
+        $directInstaller = (string) file_get_contents($buildRoot . '/runner/scripts/install_direct_https_runner.ps1');
+        $this->assertStringContainsString('serverBaseUrl must use https://', $directInstaller);
+        $this->assertStringContainsString('Invoke-WebRequest -Uri $healthUrl -UseBasicParsing', $directInstaller);
+        $this->assertStringNotContainsString('SkipCertificateCheck', $directInstaller);
+        $this->assertStringNotContainsString('dddddddddddddddddddddddddddddddd', $output);
     }
 
     public function test_invalid_transport_mode_fails_validation(): void
