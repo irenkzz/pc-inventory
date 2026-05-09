@@ -380,3 +380,33 @@ After Phase 19K is reviewed and accepted, the safest implementation path is:
 4. Later restore phase: separately approved restore into `inventory_rehearsal_restore`.
 
 Production migration and cutover remain unapproved.
+
+## 16. Phase 19L read-only readiness diagnostics
+
+Phase 19L adds read-only execute-readiness diagnostics to the existing dry-run command:
+
+```powershell
+php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory-rehearsal\source-copy\database.sqlite" --dry-run --readiness --dump-marker="D:\inventory-rehearsal\backups\mariadb_dumps\<dump-file-or-marker>"
+```
+
+Readiness mode remains non-execute:
+
+- `--readiness` requires `--dry-run`.
+- `--source` remains explicit and required.
+- `--dump-marker` is validated read-only and must point under `D:\inventory-rehearsal\backups\mariadb_dumps`.
+- `--execute` remains absent.
+- The command does not transfer/import rows.
+- The command does not reset/truncate tables.
+- The command does not create MariaDB dumps or restore MariaDB dumps.
+- The command does not write to `inventory_rehearsal_restore`.
+- The command does not expose a web endpoint, generate packages/site kits, change live config, read live SQLite, mutate live SQLite, or change runner/collector traffic.
+
+Readiness diagnostics preview Phase 19K gates only:
+
+- empty target state with allowed `migrations` rows and compare-only `classification_rules`
+- dump marker existence, location, non-zero size, and timestamp plausibility
+- compare-only `classification_rules` count/identifier/checksum status
+- count-only raw evidence path mapping diagnostics
+- optional table and known schema-difference policy checks
+
+Phase 19L still does not approve execute import, restore rehearsal, production migration, or cutover.
