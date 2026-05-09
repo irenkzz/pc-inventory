@@ -399,6 +399,8 @@ Do not switch the live Supermicro app from SQLite to MariaDB/MySQL during Phase 
 
 Phase 19B follow-up: `docs/MARIADB_REHEARSAL_ENVIRONMENT_PREP.md` documents the recommended non-production rehearsal layout at `D:\inventory-rehearsal`, including separate Laravel path, source-copy locations, rehearsal `.env` handling, local-only `APP_URL`, and no-live-runner/collector guardrails.
 
+Phase 19C follow-up: `docs/MARIADB_REHEARSAL_ENVIRONMENT_SETUP_CHECKLIST.md` documents the approved Option B filesystem-only setup checklist. It prepares folders, reviewed source, copied SQLite backup, raw archive, downloads/site kits, and `.env.rehearsal.example` only; it does not install MariaDB/MySQL or start migration work.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:

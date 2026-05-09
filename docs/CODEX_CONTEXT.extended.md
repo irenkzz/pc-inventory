@@ -381,6 +381,7 @@ Known open items:
 - Phase 18A through Phase 18F are done.
 - Phase 19A MariaDB/MySQL migration dry-run runbook is documented in `docs/MARIADB_MIGRATION_DRY_RUN_RUNBOOK.md`. It plans non-production rehearsal, backups, app-aware transfer from a copied SQLite source into a fresh Laravel-migrated MariaDB/MySQL schema, integrity checks, restore rehearsal, stop conditions, and future migration gates. It does not approve cutover or add code/commands.
 - Phase 19B MariaDB/MySQL rehearsal environment preparation is documented in `docs/MARIADB_REHEARSAL_ENVIRONMENT_PREP.md`. It recommends same-Supermicro rehearsal isolation at `D:\inventory-rehearsal` with separate Laravel path, copied SQLite source, copied raw archive/downloads, rehearsal `.env` only, local-only `APP_URL`, and no live runner/collector traffic.
+- Phase 19C MariaDB/MySQL rehearsal filesystem setup checklist is documented in `docs/MARIADB_REHEARSAL_ENVIRONMENT_SETUP_CHECKLIST.md`. It chooses Option B: controlled filesystem-only setup guidance for Supermicro, including folders, reviewed source copy, copied SQLite backup, raw archive/download copies, and `.env.rehearsal.example` placeholders only. It does not add scripts, install DB software, create DB/users, create real `.env`, run migrations, transfer data, expose a web endpoint, or approve cutover.
 - token rotation UI is not done
 - per-runner token enrollment is not done
 - some SSD telemetry gaps are expected on RAID/RST-backed clients

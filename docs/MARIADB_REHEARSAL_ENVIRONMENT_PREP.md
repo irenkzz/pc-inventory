@@ -44,6 +44,8 @@ Phase 19B narrows the next planning step to environment preparation:
 
 Phase 19B does not execute the Phase 19A dry-run.
 
+Phase 19C follow-up: `docs/MARIADB_REHEARSAL_ENVIRONMENT_SETUP_CHECKLIST.md` documents Option B, a controlled filesystem-only setup checklist for Supermicro. It allows reviewed folder/source/copy preparation only and still excludes MariaDB installation, DB/user creation, real rehearsal `.env`, migrations, data transfer, web binding, runner/collector repointing, package generation, and cutover approval.
+
 ## 3. Recommended rehearsal environment layout
 
 Recommended layout: same Supermicro host with a separate Laravel copy/path.
