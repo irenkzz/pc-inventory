@@ -60,6 +60,8 @@ Phase 19G empty Laravel schema migration on MariaDB rehearsal DB is complete. Th
 
 Phase 19H transfer planning is documented in `docs/MARIADB_REHEARSAL_TRANSFER_PLAN.md`. It defines future app-aware transfer principles, source/target boundaries, table order, validation checks, and stop conditions only; implementation, dry-run command, execute transfer, MariaDB dump, restore rehearsal, portal exposure, operational validation, and cutover remain deferred.
 
+Phase 19I adds dry-run-only Artisan command `inventory:mariadb-rehearsal-transfer` with required explicit copied SQLite `--source` and required `--dry-run`. It has no `--execute` mode and performs read-only validation/preview only.
+
 ## 3. Recommended rehearsal environment layout
 
 Recommended layout: same Supermicro host with a separate Laravel copy/path.

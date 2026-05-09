@@ -31,6 +31,8 @@ Phase 19G follow-up: the empty Laravel schema was migrated only into the MariaDB
 
 Phase 19H follow-up: app-aware transfer planning is documented in `docs/MARIADB_REHEARSAL_TRANSFER_PLAN.md`. This remains planning-only and does not approve transfer execution, restore rehearsal, live DB driver switching, live `.env` changes, package generation, runner/collector traffic changes, or production cutover.
 
+Phase 19I follow-up: dry-run-only rehearsal transfer command is implemented for validation/preview only. It has no execute mode and does not approve transfer execution, restore rehearsal, live DB driver switching, live `.env` changes, package generation, runner/collector traffic changes, or production cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.

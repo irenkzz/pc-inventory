@@ -415,6 +415,8 @@ Phase 19G empty Laravel schema migration on the MariaDB rehearsal DB is complete
 
 Phase 19H app-aware SQLite-to-MariaDB transfer planning is documented in `docs/MARIADB_REHEARSAL_TRANSFER_PLAN.md`. It is Option A documentation-only: no transfer command, dry-run helper, data transfer, table reset, dump, restore, portal exposure, operational validation, live config change, runner/collector traffic change, package generation, or cutover approval.
 
+Phase 19I implements dry-run-only command `php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory-rehearsal\source-copy\database.sqlite" --dry-run`. It requires explicit `--source` and `--dry-run`, has no `--execute`, and performs read-only source/target validation and previews only.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:

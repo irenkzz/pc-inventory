@@ -93,6 +93,8 @@ Future command requirements:
 
 `inventory_rehearsal_restore` is reserved for later restore rehearsal.
 
+Phase 19I follow-up: dry-run-only command `php artisan inventory:mariadb-rehearsal-transfer` is implemented with required `--source=` and `--dry-run`. No `--execute` mode exists. The command validates source/target boundaries, previews table/count/relationship/JSON/command/token/raw-evidence/assignment checks, prints redacted counts only, and does not write rows, reset tables, dump, restore, expose a web endpoint, generate packages, touch live config, or change runner/collector traffic.
+
 ## 4. Source and target boundaries
 
 Allowed source:
@@ -510,3 +512,26 @@ Phase 19H is accepted when:
 ## 26. Cutover-not-approved statement
 
 Phase 19H is a transfer planning document only. It does not approve production migration, production cutover, live DB driver switching, live `.env` changes, app data transfer, Laravel migration execution, portal exposure, runner/collector traffic changes, or package/site-kit generation.
+
+## 27. Phase 19I dry-run command
+
+Phase 19I implements the dry-run-only transfer planning command:
+
+```powershell
+php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory-rehearsal\source-copy\database.sqlite" --dry-run
+```
+
+Command boundaries:
+
+- `--source=` is required.
+- `--dry-run` is required.
+- `--execute` does not exist.
+- The source must be explicit and must be the copied rehearsal SQLite source.
+- Live SQLite and any source under `D:\inventory\laravel` are refused.
+- The command must run from `D:\inventory-rehearsal\laravel`.
+- Configured DB connection must be `mysql`.
+- Configured DB database must be `inventory_rehearsal`.
+- `APP_URL` must not contain `inventory-pilot.internal.lan`.
+- `inventory_rehearsal_restore` must remain empty.
+
+The command is read-only. It performs validation and previews only; it does not transfer data, reset/truncate tables, dump MariaDB, restore MariaDB, write reports by default, expose a web endpoint, generate packages/site kits, change live config, read live SQLite, mutate live SQLite, change runner/collector traffic, change command lifecycle semantics, or enable Direct `repair_update`.
