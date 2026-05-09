@@ -674,3 +674,7 @@ Boundary confirmations:
 Phase 19J dry-run evidence review is documented in `docs/MARIADB_REHEARSAL_DRY_RUN_EVIDENCE_REVIEW.md`.
 
 It is read-only and focuses on deciding whether `referenced_evidence_missing_count=353` is a real missing evidence problem or a raw evidence path-mapping problem before any execute-mode planning continues.
+
+Manual Supermicro review completed with Outcome A: `referenced_evidence_missing_count=353` is explained by path-shape/path-mapping behavior, not missing raw evidence. The copied raw archive contains `563` files, `raw_files` has `353` rows, all `353` `saved_path` basenames exist uniquely in the copied archive, and `unresolved_after_suffix_review=0`.
+
+Phase 19K should be architecture/design for execute-mode transfer with explicit raw evidence path handling. Basename/suffix resolution was unique for the current copied archive, but future implementation must not silently rely on basename-only matching unless uniqueness is proven.
