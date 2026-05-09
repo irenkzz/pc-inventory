@@ -312,3 +312,72 @@ Phase 19F is accepted when:
 ## 13. Cutover-not-approved statement
 
 Phase 19F prepares only the empty rehearsal database foundation. It does not approve production migration, cutover, live DB driver switching, live `.env` changes, app data transfer, or Laravel migration execution.
+
+## 14. Supermicro runtime validation
+
+Phase 19F status: documented, executed, and Supermicro validated.
+
+Runtime validation facts:
+
+- MariaDB service: `Running`.
+- Port `3306` on `127.0.0.1`: reachable.
+- MariaDB version: `10.11.16-MariaDB`.
+- `inventory_rehearsal`: exists and empty.
+- `inventory_rehearsal_restore`: exists and empty.
+- `inventory_rehearsal_app`: created.
+- Grants are scoped only to `inventory_rehearsal.*` and `inventory_rehearsal_restore.*`.
+- Negative access test completed and failed as expected for unrelated/system DB access.
+- No DB password, root password, or credential value was printed or recorded.
+
+Final boundary confirmations:
+
+- Real rehearsal `.env` does not exist.
+- `D:\inventory-rehearsal\laravel\database\database.sqlite` does not exist.
+- `D:\inventory-rehearsal\source-copy\database.sqlite` still exists.
+- Copied SQLite source remains read-only.
+- No Laravel migrations ran.
+- No app data transfer ran.
+- No SQLite-to-MySQL conversion ran.
+- No package/site-kit generation occurred.
+- No `php artisan serve` was run.
+- No HPE StoreEasy or DNS changes occurred.
+- No runner/collector traffic changed.
+- Live `.env`, live `APP_URL`, and live DB driver remain unchanged.
+- No secrets were printed or recorded.
+
+## 15. Phase 19G empty Laravel schema migration
+
+Phase 19G status: executed and Supermicro validated.
+
+Runtime facts:
+
+- Real rehearsal `.env` exists only at `D:\inventory-rehearsal\laravel\.env`.
+- New rehearsal `APP_KEY` was generated and not printed or recorded.
+- DB password was stored only in rehearsal `.env` and the operator password store.
+- Laravel migrations were run only from `D:\inventory-rehearsal\laravel`.
+- Migration target: `inventory_rehearsal`.
+- `php artisan migrate` completed successfully.
+- `php artisan migrate:status` showed all migrations as `Ran`.
+- `inventory_rehearsal` table count: `20`.
+- `inventory_rehearsal_restore` remained empty / no table-count row.
+- `D:\inventory-rehearsal\laravel\database\database.sqlite` does not exist.
+- `D:\inventory-rehearsal\source-copy\database.sqlite` exists.
+- `D:\inventory-rehearsal\source-copy\database.sqlite` remains read-only.
+- Live git status was clean after boundary check.
+
+Boundary confirmations:
+
+- Live `D:\inventory\laravel\.env` was not changed.
+- Live `APP_URL` was not changed.
+- Live DB driver was not changed.
+- Live SQLite was not mutated.
+- No app data transfer occurred.
+- No SQLite-to-MySQL conversion occurred.
+- No web endpoint was exposed.
+- No `php artisan serve` was run.
+- No package/site-kit generation occurred.
+- No runner/collector traffic changed.
+- No HPE StoreEasy change occurred.
+- No DNS change occurred.
+- No production cutover was approved.
+- No `.env` values, `APP_KEY`, DB password, token secrets, token hashes, bearer tokens, raw CSV contents, command payload JSON, full configs, or full runner GUIDs were printed or recorded.

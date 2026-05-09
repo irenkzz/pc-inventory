@@ -25,6 +25,10 @@ Phase 19E follow-up: the verified SQLite rehearsal source and evidence files hav
 
 Phase 19F follow-up: controlled MariaDB/MySQL rehearsal database setup is documented in `docs/MARIADB_REHEARSAL_DB_SETUP.md`. This prepares only empty rehearsal databases and scoped rehearsal app user validation; it does not approve Laravel migrations, app data transfer, live DB driver switching, live `.env` changes, or production cutover.
 
+Phase 19F Supermicro validation confirms the rehearsal MariaDB foundation is ready: MariaDB `10.11.16-MariaDB` is running on localhost, rehearsal schemas exist and are empty, and the rehearsal app user is scoped only to rehearsal databases. This remains rehearsal-only and does not approve live DB driver switching, app data transfer, migrations, or cutover.
+
+Phase 19G follow-up: the empty Laravel schema was migrated only into the MariaDB rehearsal database `inventory_rehearsal`; all migrations show `Ran`, with `20` rehearsal tables and an empty restore-test database. This remains rehearsal-only and does not approve app data transfer, live DB driver switching, live `.env` changes, web exposure, runner/collector traffic changes, or production cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
