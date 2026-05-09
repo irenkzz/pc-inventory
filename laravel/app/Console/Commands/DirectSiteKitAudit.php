@@ -47,6 +47,10 @@ class DirectSiteKitAudit extends Command
         $this->okLine('Direct HTTPS site kit found: ' . $this->safeRelativePath($artifact));
 
         $configPath = $artifact . DIRECTORY_SEPARATOR . 'runner' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'runner-config.template.json';
+        $directReadmePath = $artifact . DIRECTORY_SEPARATOR . 'README_DIRECT_HTTPS_RUNNER.txt';
+        $directLauncherPath = $artifact . DIRECTORY_SEPARATOR . 'INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd';
+        $directInstallerPath = $artifact . DIRECTORY_SEPARATOR . 'runner' . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'install_direct_https_runner.ps1';
+        $collectorLauncherPath = $artifact . DIRECTORY_SEPARATOR . 'INSTALL_COLLECTOR_SITE.cmd';
         $readmePaths = $this->readmePaths($artifact);
         if (! is_file($configPath)) {
             $this->failLine('Runner config not found.');
@@ -60,6 +64,30 @@ class DirectSiteKitAudit extends Command
             $this->okLine('README found');
         }
 
+        if (is_file($directReadmePath)) {
+            $this->okLine('README_DIRECT_HTTPS_RUNNER.txt found');
+        } else {
+            $this->failLine('README_DIRECT_HTTPS_RUNNER.txt not found.');
+        }
+
+        if (is_file($directLauncherPath)) {
+            $this->okLine('INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd found');
+        } else {
+            $this->failLine('INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd not found.');
+        }
+
+        if (is_file($directInstallerPath)) {
+            $this->okLine('runner/scripts/install_direct_https_runner.ps1 found');
+        } else {
+            $this->failLine('runner/scripts/install_direct_https_runner.ps1 not found.');
+        }
+
+        if (is_file($collectorLauncherPath)) {
+            $this->failLine('Direct HTTPS package exposes INSTALL_COLLECTOR_SITE.cmd as a top-level entry point.');
+        } else {
+            $this->okLine('Direct HTTPS package does not expose INSTALL_COLLECTOR_SITE.cmd top-level entry point');
+        }
+
         $this->newLine();
         $this->line('Checks:');
 
@@ -70,7 +98,8 @@ class DirectSiteKitAudit extends Command
             $this->auditConfig($config);
         }
 
-        $this->auditTextForSecrets(array_merge([$configPath], $readmePaths));
+        $this->auditDirectReadme($directReadmePath);
+        $this->auditTextForSecrets(array_merge([$configPath, $directReadmePath, $directLauncherPath], $readmePaths));
         $this->okLine('collector-share mode is not modified by this audit');
 
         $this->newLine();
@@ -212,6 +241,40 @@ class DirectSiteKitAudit extends Command
         }
     }
 
+    private function auditDirectReadme(string $path): void
+    {
+        if (! is_file($path)) {
+            return;
+        }
+
+        $text = (string) file_get_contents($path);
+        $lower = strtolower($text);
+
+        if (str_contains($text, 'Direct HTTPS')) {
+            $this->okLine('Direct HTTPS README contains Direct HTTPS wording');
+        } else {
+            $this->failLine('Direct HTTPS README does not contain Direct HTTPS wording.');
+        }
+
+        if (str_contains($lower, 'small/no-it')) {
+            $this->okLine('Direct HTTPS README contains small/no-IT wording');
+        } else {
+            $this->failLine('Direct HTTPS README does not contain small/no-IT wording.');
+        }
+
+        if (str_contains($lower, 'https endpoint') && str_contains($lower, 'trusted certificate')) {
+            $this->okLine('Direct HTTPS README contains HTTPS/certificate warning');
+        } else {
+            $this->failLine('Direct HTTPS README does not contain HTTPS/certificate warning.');
+        }
+
+        if (str_contains($text, 'Direct repair_update remains blocked')) {
+            $this->okLine('Direct HTTPS README states Direct repair_update remains blocked');
+        } else {
+            $this->failLine('Direct HTTPS README does not state Direct repair_update remains blocked.');
+        }
+    }
+
     private function containsUnsafeSecret(string $path, string $text): bool
     {
         $filename = basename($path);
@@ -243,7 +306,7 @@ class DirectSiteKitAudit extends Command
     private function readmePaths(string $artifact): array
     {
         $paths = [];
-        foreach (['README_SITE_KIT.md', 'READ_ME_FIRST_FOR_BRANCH.txt'] as $filename) {
+        foreach (['README_SITE_KIT.md', 'READ_ME_FIRST_FOR_BRANCH.txt', 'README_DIRECT_HTTPS_RUNNER.txt'] as $filename) {
             $path = $artifact . DIRECTORY_SEPARATOR . $filename;
             if (is_file($path)) {
                 $paths[] = $path;

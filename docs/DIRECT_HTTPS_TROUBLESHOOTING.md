@@ -370,10 +370,13 @@ Expected behavior:
 Normal install from an extracted Direct HTTPS package:
 
 ```text
+INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd
 INSTALL_THIS_PC_RUNNER_ONLY.cmd
 ```
 
-That launcher stages the package locally, asks for administrator approval, and invokes the wrapper with `runner-config.template.json`.
+Use `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd` for new installs. It is an additive mode-specific alias for Direct HTTPS small/no-IT runner packages. `INSTALL_THIS_PC_RUNNER_ONLY.cmd` remains for backward compatibility. The launcher stages the package locally, asks for administrator approval, and invokes the wrapper with `runner-config.template.json`.
+
+Generated Direct HTTPS packages also include `README_DIRECT_HTTPS_RUNNER.txt`. It documents the flow `Runner on this PC -> Laravel HTTPS portal`, HTTPS/trusted certificate requirements, no plain HTTP, no disabled TLS validation, no `-SkipCertificateCheck`, and that Direct `repair_update` remains blocked for the MVP. Direct HTTPS packages do not expose `INSTALL_COLLECTOR_SITE.cmd` as a top-level entry point.
 
 Manual wrapper run from an extracted Direct HTTPS package:
 

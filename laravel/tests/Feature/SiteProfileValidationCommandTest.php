@@ -192,8 +192,11 @@ class SiteProfileValidationCommandTest extends TestCase
         $collectorConfig = storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/collector/collector_config.json');
         $this->assertFileExists($collectorConfig);
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/START_HERE_INSTALL_COLLECTOR_PC.cmd'));
+        $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_COLLECTOR_SITE.cmd'));
+        $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/README_COLLECTOR_SITE.txt'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_THIS_PC_RUNNER_ONLY.cmd'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/READ_ME_FIRST_FOR_BRANCH.txt'));
+        $this->assertFileDoesNotExist(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd'));
 
         $config = json_decode((string) file_get_contents($collectorConfig), true);
         $this->assertSame('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', $config['site_token']);
@@ -210,6 +213,23 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertStringContainsString('robocopy "." "%STAGE%"', $runnerLauncher);
         $this->assertStringContainsString('Start-Process powershell.exe -Verb RunAs', $runnerLauncher);
         $this->assertStringNotContainsString('install_direct_https_runner.ps1', $runnerLauncher);
+
+        $collectorSiteLauncher = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_COLLECTOR_SITE.cmd'));
+        $this->assertStringContainsString('HQ/branch/multi-PC collector-share mode', $collectorSiteLauncher);
+        $this->assertStringContainsString('collector\\install_collector_site.ps1', $collectorSiteLauncher);
+        $this->assertStringNotContainsString('dddddddddddddddddddddddddddddddd', $collectorSiteLauncher);
+
+        $collectorReadme = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/README_COLLECTOR_SITE.txt'));
+        $this->assertStringContainsString('HQ, branch, lab, or multi-PC site', $collectorReadme);
+        $this->assertStringContainsString('Runner PCs -> local/SMB branch share -> Collector -> Laravel HTTPS portal', $collectorReadme);
+        $this->assertStringContainsString('Python 3.x is required on the collector host for MVP', $collectorReadme);
+        $this->assertStringContainsString('Python is not auto-installed or bundled in this MVP', $collectorReadme);
+        $this->assertStringContainsString('Requires a branch-share path', $collectorReadme);
+        $this->assertStringContainsString('/collectors', $collectorReadme);
+        $this->assertStringContainsString('/runners', $collectorReadme);
+        $this->assertStringContainsString('Hybrid means one organization may use both modes across different sites', $collectorReadme);
+        $this->assertStringContainsString('It does not mean mixing Direct HTTPS and collector-share inside one runner installation', $collectorReadme);
+        $this->assertStringNotContainsString('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', $collectorReadme);
 
         $installer = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_SITE_KIT.ps1'));
         $this->assertStringContainsString('function Invoke-LoggedCommand', $installer);
@@ -395,8 +415,11 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertFileDoesNotExist($buildRoot . '/collector/install_collector_site.ps1');
         $this->assertFileDoesNotExist($buildRoot . '/START_HERE_INSTALL_COLLECTOR_PC.cmd');
         $this->assertFileDoesNotExist($buildRoot . '/INSTALL_COLLECTOR_ONLY.cmd');
+        $this->assertFileDoesNotExist($buildRoot . '/INSTALL_COLLECTOR_SITE.cmd');
         $this->assertFileDoesNotExist($buildRoot . '/INSTALL_COLLECTOR_COMMAND.txt');
         $this->assertFileExists($buildRoot . '/INSTALL_THIS_PC_RUNNER_ONLY.cmd');
+        $this->assertFileExists($buildRoot . '/INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd');
+        $this->assertFileExists($buildRoot . '/README_DIRECT_HTTPS_RUNNER.txt');
         $this->assertFileExists($buildRoot . '/runner/scripts/install_direct_https_runner.ps1');
 
         $directRunnerLauncher = (string) file_get_contents($buildRoot . '/INSTALL_THIS_PC_RUNNER_ONLY.cmd');
@@ -404,6 +427,24 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertStringContainsString('runner-config.template.json', $directRunnerLauncher);
         $this->assertStringContainsString('-UseComputerNameAsRunnerId', $directRunnerLauncher);
         $this->assertStringNotContainsString('INSTALL_SITE_KIT.ps1', $directRunnerLauncher);
+
+        $directAliasLauncher = (string) file_get_contents($buildRoot . '/INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd');
+        $this->assertStringContainsString('small/no-IT site', $directAliasLauncher);
+        $this->assertStringContainsString('INSTALL_THIS_PC_RUNNER_ONLY.cmd', $directAliasLauncher);
+        $this->assertStringNotContainsString('dddddddddddddddddddddddddddddddd', $directAliasLauncher);
+
+        $directReadme = (string) file_get_contents($buildRoot . '/README_DIRECT_HTTPS_RUNNER.txt');
+        $this->assertStringContainsString('small/no-IT site', $directReadme);
+        $this->assertStringContainsString('Runner on this PC -> Laravel HTTPS portal', $directReadme);
+        $this->assertStringContainsString('Requires an HTTPS endpoint and trusted certificate', $directReadme);
+        $this->assertStringContainsString('Direct repair_update remains blocked for Direct HTTPS MVP', $directReadme);
+        $this->assertStringContainsString('/runners', $directReadme);
+        $this->assertStringContainsString('php artisan inventory:direct-pilot-status', $directReadme);
+        $this->assertStringContainsString('php artisan inventory:direct-runner-triage {runnerId}', $directReadme);
+        $this->assertStringContainsString('php artisan inventory:direct-site-kit-audit', $directReadme);
+        $this->assertStringContainsString('Hybrid means one organization may use both modes across different sites', $directReadme);
+        $this->assertStringContainsString('It does not mean mixing Direct HTTPS and collector-share inside one runner installation', $directReadme);
+        $this->assertStringNotContainsString('dddddddddddddddddddddddddddddddd', $directReadme);
 
         $directInstaller = (string) file_get_contents($buildRoot . '/runner/scripts/install_direct_https_runner.ps1');
         $this->assertStringContainsString('serverBaseUrl must use https://', $directInstaller);

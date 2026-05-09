@@ -150,12 +150,18 @@ class SiteKitBuilder
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_SITE_KIT.cmd', $this->siteKitCmd($siteId) . PHP_EOL);
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'START_HERE_INSTALL_COLLECTOR_PC.cmd', $this->siteKitModeCmd('CollectorAndRunner', $siteId) . PHP_EOL);
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_COLLECTOR_ONLY.cmd', $this->siteKitModeCmd('CollectorOnly', $siteId) . PHP_EOL);
+            File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_COLLECTOR_SITE.cmd', $this->collectorSiteCmd($siteId) . PHP_EOL);
+            File::put($buildRoot . DIRECTORY_SEPARATOR . 'README_COLLECTOR_SITE.txt', $this->collectorSiteReadme($runnerVersion) . PHP_EOL);
         }
         File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_THIS_PC_RUNNER_ONLY.cmd', (
             $transportMode === 'direct_https'
                 ? $this->directHttpsRunnerCmd($siteId)
                 : $this->siteKitModeCmd('RunnerOnly', $siteId)
         ) . PHP_EOL);
+        if ($transportMode === 'direct_https') {
+            File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd', $this->directHttpsRunnerAliasCmd($siteId) . PHP_EOL);
+            File::put($buildRoot . DIRECTORY_SEPARATOR . 'README_DIRECT_HTTPS_RUNNER.txt', $this->directHttpsRunnerReadme($runnerVersion) . PHP_EOL);
+        }
         File::put($buildRoot . DIRECTORY_SEPARATOR . 'FORCE_UPDATE_THIS_PC_RUNNER.cmd', $this->forceUpdateCmd('runner') . PHP_EOL);
         if ($collectorEnabled) {
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'branch-share/packages/runner/FORCE_UPDATE_THIS_PC_RUNNER.cmd', $this->forceUpdateCmd('current') . PHP_EOL);
@@ -351,6 +357,46 @@ class SiteKitBuilder
             . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\runner\\scripts\\install_direct_https_runner.ps1','-ConfigPath','%STAGE%\\runner\\config\\runner-config.template.json','-UseComputerNameAsRunnerId')\"\r\n"
             . "echo.\r\n"
             . "echo Direct HTTPS runner installer finished. If there were errors, send the installer log path shown above to IT.\r\n"
+            . "pause\r\n";
+    }
+
+    private function directHttpsRunnerAliasCmd(string $siteId): string
+    {
+        return "@echo off\r\n"
+            . "echo This installs this PC as a Direct HTTPS runner for a small/no-IT site.\r\n"
+            . "echo.\r\n"
+            . "call \"%~dp0INSTALL_THIS_PC_RUNNER_ONLY.cmd\"\r\n"
+            . "exit /b %ERRORLEVEL%\r\n";
+    }
+
+    private function collectorSiteCmd(string $siteId): string
+    {
+        return "@echo off\r\n"
+            . "setlocal\r\n"
+            . "set \"SOURCE=%~dp0\"\r\n"
+            . "set \"STAGE=%PUBLIC%\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
+            . "echo This installs the collector site for HQ/branch/multi-PC collector-share mode.\r\n"
+            . "echo Staging collector-site installer locally...\r\n"
+            . "pushd \"%SOURCE%\"\r\n"
+            . "if errorlevel 1 (\r\n"
+            . "  echo Could not access installer source: %SOURCE%\r\n"
+            . "  pause\r\n"
+            . "  exit /b 1\r\n"
+            . ")\r\n"
+            . "if exist \"%STAGE%\" rmdir /s /q \"%STAGE%\"\r\n"
+            . "mkdir \"%STAGE%\" >nul 2>nul\r\n"
+            . "robocopy \".\" \"%STAGE%\" /MIR /XD data storage vendor node_modules .git /XF install-site-kit.log /R:2 /W:1 >nul\r\n"
+            . "set \"RC=%ERRORLEVEL%\"\r\n"
+            . "popd\r\n"
+            . "if %RC% GEQ 8 (\r\n"
+            . "  echo Could not copy installer locally. Robocopy exit code: %RC%\r\n"
+            . "  pause\r\n"
+            . "  exit /b %RC%\r\n"
+            . ")\r\n"
+            . "cd /d \"%STAGE%\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\collector\\install_collector_site.ps1','-CollectorRoot','%STAGE%\\collector','-ConfigPath','%STAGE%\\collector\\collector_config.json')\"\r\n"
+            . "echo.\r\n"
+            . "echo Collector-site installer finished. If there were errors, send the installer log path shown above to IT.\r\n"
             . "pause\r\n";
     }
 
@@ -704,6 +750,92 @@ PS1;
             . "- Windows administrator permission\r\n"
             . "- Logged-in Windows account can read/write the inventory share\r\n"
             . "- Access to inventory share: {$shareRoot}\r\n";
+    }
+
+    private function directHttpsRunnerReadme(string $runnerVersion): string
+    {
+        return "Direct HTTPS Runner Package\r\n"
+            . "\r\n"
+            . "Use this package for one PC, a small/no-IT site, or a remote PC without a branch-share or collector.\r\n"
+            . "\r\n"
+            . "Flow:\r\n"
+            . "Runner on this PC -> Laravel HTTPS portal\r\n"
+            . "\r\n"
+            . "Requirements and boundaries:\r\n"
+            . "- Requires an HTTPS endpoint and trusted certificate.\r\n"
+            . "- Do not use a collector-share token.\r\n"
+            . "- Do not use plain HTTP.\r\n"
+            . "- Do not disable TLS validation.\r\n"
+            . "- Do not use -SkipCertificateCheck.\r\n"
+            . "- Direct repair_update remains blocked for Direct HTTPS MVP.\r\n"
+            . "- Official packages/site kits are generated only on Supermicro.\r\n"
+            . "- Do not generate official packages from IT-ADMIN.\r\n"
+            . "\r\n"
+            . "Run:\r\n"
+            . "INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd\r\n"
+            . "\r\n"
+            . "Verify in portal:\r\n"
+            . "- /runners\r\n"
+            . "- Direct HTTPS transport\r\n"
+            . "- runner version {$runnerVersion}\r\n"
+            . "- recent heartbeat\r\n"
+            . "- recent direct poll\r\n"
+            . "- upload / Last Inventory populated after scan\r\n"
+            . "- repair/update blocked\r\n"
+            . "\r\n"
+            . "Optional Supermicro checks:\r\n"
+            . "php artisan inventory:direct-pilot-status\r\n"
+            . "php artisan inventory:direct-runner-triage {runnerId}\r\n"
+            . "php artisan inventory:direct-site-kit-audit\r\n"
+            . "\r\n"
+            . "Hybrid note:\r\n"
+            . "Hybrid means one organization may use both modes across different sites.\r\n"
+            . "It does not mean mixing Direct HTTPS and collector-share inside one runner installation.\r\n"
+            . "Each package remains mode-specific.\r\n";
+    }
+
+    private function collectorSiteReadme(string $runnerVersion): string
+    {
+        return "Collector-share Site Package\r\n"
+            . "\r\n"
+            . "Use this package for an HQ, branch, lab, or multi-PC site.\r\n"
+            . "\r\n"
+            . "Flow:\r\n"
+            . "Runner PCs -> local/SMB branch share -> Collector -> Laravel HTTPS portal\r\n"
+            . "\r\n"
+            . "Requirements and boundaries:\r\n"
+            . "- Python 3.x is required on the collector host for MVP.\r\n"
+            . "- Python is not auto-installed or bundled in this MVP.\r\n"
+            . "- If Python is missing, the installer should fail clearly.\r\n"
+            . "- Requires a branch-share path.\r\n"
+            . "- Requires an HTTPS endpoint and trusted certificate.\r\n"
+            . "- Do not use the Direct HTTPS runner wrapper for this package.\r\n"
+            . "- Do not mix Direct HTTPS and collector-share inside one runner install.\r\n"
+            . "- Official packages/site kits are generated only on Supermicro.\r\n"
+            . "- Do not generate official packages from IT-ADMIN.\r\n"
+            . "\r\n"
+            . "Run first:\r\n"
+            . "INSTALL_COLLECTOR_SITE.cmd\r\n"
+            . "\r\n"
+            . "Then deploy/install branch runners using the staged collector-share runner package/share flow.\r\n"
+            . "\r\n"
+            . "Verify in portal:\r\n"
+            . "- /collectors\r\n"
+            . "- collector status recent\r\n"
+            . "- /runners\r\n"
+            . "- collector-share runners appear normally\r\n"
+            . "- CSV upload/ingest works\r\n"
+            . "- command delivery/ACK works through collector-share\r\n"
+            . "- runner version {$runnerVersion}\r\n"
+            . "\r\n"
+            . "Optional Supermicro checks:\r\n"
+            . "php artisan inventory:install-preflight\r\n"
+            . "php artisan inventory:production-readiness\r\n"
+            . "\r\n"
+            . "Hybrid note:\r\n"
+            . "Hybrid means one organization may use both modes across different sites.\r\n"
+            . "It does not mean mixing Direct HTTPS and collector-share inside one runner installation.\r\n"
+            . "Each package remains mode-specific.\r\n";
     }
 
     private function zipDirectory(string $sourceDir, string $zipPath): void
