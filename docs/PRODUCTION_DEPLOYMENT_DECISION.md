@@ -21,6 +21,8 @@ Phase 19B follow-up documents rehearsal environment preparation in `docs/MARIADB
 
 Phase 19C follow-up documents the filesystem-only rehearsal setup checklist in `docs/MARIADB_REHEARSAL_ENVIRONMENT_SETUP_CHECKLIST.md`. It is still pre-migration planning and does not approve MariaDB/MySQL installation, DB/user creation, migrations, data transfer, web binding, live `.env` changes, or cutover.
 
+Phase 19E follow-up: the verified SQLite rehearsal source and evidence files have been copied into `D:\inventory-rehearsal` and validated without migration or cutover approval. MariaDB/MySQL installation, DB/user creation, migrations, app data transfer, live `.env`/`APP_URL` changes, and production cutover remain unapproved.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.

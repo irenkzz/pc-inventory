@@ -8,6 +8,8 @@ Phase 19C is documentation/checklist only in Git.
 
 Phase 19D follow-up: `tools/Prepare-MariaDbRehearsalFilesystem.ps1` adds an optional helper for this checklist. The helper is dry-run by default and must be copied/run manually on Supermicro for execution. It does not install MariaDB/MySQL, create DB/users, run migrations, create a real `.env`, transfer app data, expose a web endpoint, generate packages, or touch live runner/collector traffic.
 
+Phase 19D status: implemented, tested, pushed, Supermicro dry-run validated, and Supermicro filesystem execution validated with expected `WARN`.
+
 Non-goals:
 
 - Do not write application code.
@@ -166,6 +168,106 @@ The goal is a reviewed filesystem layout, not a runnable rehearsal app.
 Phase 19C may create `.env.rehearsal.example` only.
 
 The Phase 19D helper creates `.env.rehearsal.example` only. It must not create a real rehearsal `.env`, copy live `.env`, copy or print `APP_KEY`, or generate `APP_KEY`.
+
+## Phase 19D Supermicro validation
+
+Supermicro dry-run command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Prepare-MariaDbRehearsalFilesystem.ps1
+```
+
+Dry-run result:
+
+```text
+Result: WARN
+```
+
+Expected dry-run warnings:
+
+- SQLite backup copy skipped because no `-SqliteBackupPath` was supplied.
+- Raw archive copy skipped because `-CopyRawArchive` was not supplied.
+- Downloads/site kits copy skipped because `-CopyDownloads` was not supplied.
+
+Supermicro filesystem execution command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Prepare-MariaDbRehearsalFilesystem.ps1 -Execute
+```
+
+Execution result:
+
+```text
+Result: WARN
+```
+
+Observed:
+
+- `D:\inventory-rehearsal` created.
+- `D:\inventory-rehearsal\laravel` created/copied.
+- `D:\inventory-rehearsal\backups` created.
+- `D:\inventory-rehearsal\source-copy` created.
+- `D:\inventory-rehearsal\raw_archive` created.
+- `D:\inventory-rehearsal\downloads` created.
+- `D:\inventory-rehearsal\logs` created.
+- `D:\inventory-rehearsal\notes` created.
+- `.env.rehearsal.example` exists.
+- Real `.env` does not exist.
+- `D:\inventory-rehearsal\laravel\database\database.sqlite` does not exist.
+- `D:\inventory-rehearsal\source-copy\database.sqlite` does not exist yet because no verified SQLite backup was supplied.
+- Non-secret setup notes file was created: `setup-notes-20260509-214250.txt`.
+- Robocopy exit code `1` was treated as non-fatal because files were copied.
+
+Confirmed:
+
+- No MariaDB/MySQL installation.
+- No DB/user creation.
+- No Laravel migrations.
+- No app data transfer.
+- No real `.env`.
+- No live `.env` change.
+- No live `APP_URL` change.
+- No production data mutation.
+- No package/site-kit generation.
+- No runner/collector traffic changes.
+- No secrets exposed.
+
+## Phase 19E verified source/evidence copy
+
+Phase 19E status: executed and validated with expected `WARN`.
+
+Summary:
+
+- Verified SQLite backup copied to `D:\inventory-rehearsal\source-copy\database.sqlite`.
+- The copied SQLite source is the rehearsal migration source copy.
+- The live SQLite database was not used directly as the transfer source.
+- Copied SQLite file exists.
+- Copied SQLite file size: `5,910,528` bytes.
+- Copied SQLite file is read-only: `True`.
+- SQLite integrity check on the copied DB returned `ok`.
+- Raw archive copied to `D:\inventory-rehearsal\raw_archive`.
+- Downloads/site kits copied to `D:\inventory-rehearsal\downloads`.
+- Robocopy warnings were non-fatal: source copy exit code `3`, raw archive copy exit code `1`, downloads/site kits copy exit code `1`.
+- Non-secret setup notes were written: `D:\inventory-rehearsal\notes\setup-notes-20260509-220015.txt`.
+
+Important note: `sqlite3` CLI was not available on Supermicro, so SQLite integrity validation was completed using PHP/PDO against only `D:\inventory-rehearsal\source-copy\database.sqlite`.
+
+Confirmed:
+
+- Real rehearsal `.env` does not exist.
+- `D:\inventory-rehearsal\laravel\database\database.sqlite` does not exist.
+- No MariaDB/MySQL installation occurred.
+- No DB/user creation occurred.
+- No Laravel migrations ran.
+- No app data transfer ran.
+- No SQLite-to-MySQL conversion ran.
+- No package/site-kit generation occurred.
+- No runner/collector traffic changed.
+- Live `.env` was not changed.
+- Live `APP_URL` was not changed.
+- Live DB driver was not changed.
+- Production data was not mutated.
+- No secrets were printed or recorded.
 
 Placeholder example:
 
