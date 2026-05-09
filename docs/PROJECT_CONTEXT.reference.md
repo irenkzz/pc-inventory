@@ -701,8 +701,8 @@ php artisan inventory:backup --label=pre-cutover
 - SQLite is still acceptable for local development and pilot, but long-term production DB choice is not finalized.
 - Direct `repair_update` remains blocked for Direct HTTPS MVP.
 - Direct HTTPS rollout remains manual package refresh/reinstall for now; Phase 18D Direct HTTPS installer wrapper is implemented, live-validated with manual Scheduled Task trigger on `LAPTOP-I76TA97E`, and documented.
-- Phase 18E collector-site installer wrapper is implemented in source and validates generated collector-share configs, HTTPS `/health`, branch-share read/write with a temporary probe, collector Scheduled Task/config, and runner staging presence without changing collector runtime behavior; Supermicro/live collector validation is still required after pull.
-- Phase 18E.1 improves collector installer Python dependency handling: collector-share MVP requires Python 3.x on the collector host, missing Python now fails clearly without the old `Source` property error, Python is not auto-installed or bundled, and small/no-IT sites should use Direct HTTPS mode.
+- Phase 18E collector-site installer wrapper is implemented, package-included, and validated to the MVP boundary: generated collector-share config, HTTPS `/health`, branch-share read/write probe, runner staging, and config backup passed before the managed-host Python dependency check stopped installation cleanly.
+- Phase 18E.1 improves collector installer Python dependency handling: collector-share MVP requires Python 3.x on the collector host, missing Python now fails clearly without the old `Source` property error, Python is not auto-installed or bundled, small/no-IT sites should use Direct HTTPS mode, and future productization may bundle Python or package the collector as a self-contained executable/service.
 - token rotation UI is still not done.
 - per-runner token enrollment is still not done.
 - some SSD telemetry gaps are expected on RAID/RST-backed clients.

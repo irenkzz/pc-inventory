@@ -418,5 +418,6 @@ Live runner validation:
 6. Keep Direct HTTPS rollout focused on small/no-IT sites first.
 7. Phase 18C Portal Setup Wizard MVP is done.
 8. Phase 18D Direct HTTPS Runner Installer MVP is done; continue normal scheduled-interval monitoring for Direct HTTPS runners.
-9. Phase 18E Collector-site Installer MVP is implemented in source and keeps Direct HTTPS behavior unaffected; Phase 18E.1 clarifies that collector-share MVP requires Python on the collector host and small/no-IT sites should use Direct HTTPS mode.
-10. Later return to MariaDB migration runbook and rehearsal.
+9. Phase 18E Collector-site Installer MVP is implemented and keeps Direct HTTPS behavior unaffected; Phase 18E.1 is done and confirms collector-share MVP requires Python on the managed collector host while small/no-IT sites should use Direct HTTPS mode.
+10. Plan Phase 18F Package UX Simplification and Mode-specific Installer Entry Points.
+11. Later return to MariaDB migration runbook and rehearsal.
