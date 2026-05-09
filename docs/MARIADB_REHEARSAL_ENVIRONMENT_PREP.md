@@ -56,6 +56,8 @@ Phase 19F MariaDB/MySQL rehearsal database setup is documented in `docs/MARIADB_
 
 Phase 19F Supermicro runtime validation is complete: MariaDB `10.11.16-MariaDB` service is running, `127.0.0.1:3306` is reachable, `inventory_rehearsal` and `inventory_rehearsal_restore` exist and are empty, `inventory_rehearsal_app` exists with grants scoped only to those rehearsal databases, and negative access to unrelated/system DBs failed as expected. No credentials or secrets were printed or recorded.
 
+Phase 19G empty Laravel schema migration on MariaDB rehearsal DB is complete. The real rehearsal `.env` exists only in `D:\inventory-rehearsal\laravel`, migrations ran only from that rehearsal path against `inventory_rehearsal`, all migrations show `Ran`, and `inventory_rehearsal` now has `20` tables. The restore DB remains empty, the copied SQLite source remains read-only, and no app data transfer, SQLite-to-MySQL conversion, live config change, web exposure, package generation, runner/collector traffic change, cutover approval, or secret exposure occurred.
+
 ## 3. Recommended rehearsal environment layout
 
 Recommended layout: same Supermicro host with a separate Laravel copy/path.
