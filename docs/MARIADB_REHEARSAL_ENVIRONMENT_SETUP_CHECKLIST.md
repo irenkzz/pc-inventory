@@ -6,6 +6,8 @@ Phase 19C provides a reviewed manual checklist for preparing the non-production 
 
 Phase 19C is documentation/checklist only in Git.
 
+Phase 19D follow-up: `tools/Prepare-MariaDbRehearsalFilesystem.ps1` adds an optional helper for this checklist. The helper is dry-run by default and must be copied/run manually on Supermicro for execution. It does not install MariaDB/MySQL, create DB/users, run migrations, create a real `.env`, transfer app data, expose a web endpoint, generate packages, or touch live runner/collector traffic.
+
 Non-goals:
 
 - Do not write application code.
@@ -106,6 +108,17 @@ Manual checklist after review:
 
 This checklist does not require executing rehearsal application commands.
 
+Optional helper after Phase 19D review:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Prepare-MariaDbRehearsalFilesystem.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Prepare-MariaDbRehearsalFilesystem.ps1 -Execute
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Prepare-MariaDbRehearsalFilesystem.ps1 -Execute -SqliteBackupPath "D:\path\to\verified-backup.sqlite"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Prepare-MariaDbRehearsalFilesystem.ps1 -Execute -SqliteBackupPath "D:\path\to\verified-backup.sqlite" -CopyRawArchive -CopyDownloads
+```
+
+Run `-Execute` only after manually copying the helper to Supermicro and confirming it targets Supermicro paths. IT-ADMIN may run static tests only.
+
 ## 6. Rehearsal directory structure
 
 Recommended directory structure:
@@ -151,6 +164,8 @@ The goal is a reviewed filesystem layout, not a runnable rehearsal app.
 ## 8. .env.rehearsal.example rules
 
 Phase 19C may create `.env.rehearsal.example` only.
+
+The Phase 19D helper creates `.env.rehearsal.example` only. It must not create a real rehearsal `.env`, copy live `.env`, copy or print `APP_KEY`, or generate `APP_KEY`.
 
 Placeholder example:
 
