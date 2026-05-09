@@ -421,6 +421,8 @@ Phase 19I Supermicro dry-run validation completed with expected `WARN`. Hard bou
 
 Phase 19J is the read-only evidence review phase for the Phase 19I warning `referenced_evidence_missing_count=353`. It documents how to determine whether the warning is caused by path mapping or genuinely missing copied evidence before any execute-mode planning.
 
+Phase 19J manual Supermicro review concluded Outcome A: the raw evidence warning is explained by path-shape/path-mapping behavior, not missing copied evidence. Execute-mode transfer and cutover remain unapproved.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:

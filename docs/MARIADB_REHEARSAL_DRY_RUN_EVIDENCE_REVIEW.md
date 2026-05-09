@@ -171,3 +171,93 @@ Phase 19J is accepted when:
 ## 8. Cutover-not-approved statement
 
 Phase 19J is not production approval and not cutover approval. It does not approve execute-mode transfer, MariaDB restore rehearsal, live DB driver switching, live `.env` changes, HPE StoreEasy/DNS changes, runner/collector repointing, or package/site-kit generation.
+
+## 9. Phase 19J manual Supermicro review result
+
+Manual Phase 19J review was completed on Supermicro using count-only, redacted PowerShell/PHP helper output under `D:\inventory-rehearsal\logs`. Temporary helper/log files were not added to the repository.
+
+First copied raw archive count:
+
+- `raw_archive_file_count=563`
+
+Raw evidence path audit:
+
+- `phase=19J_raw_evidence_review`
+- `mode=read_only_count_only`
+- `sqlite_source_exists=yes`
+- `raw_archive_root_exists=yes`
+- `raw_archive_file_count=563`
+- `raw_files_row_count=353`
+- `raw_files_schema_columns=id,raw_hash,original_filename,saved_path,raw_format,received_at,metadata_json,created_at,updated_at,upload_id`
+- `likely_reference_columns=original_filename,saved_path`
+- review note: counts only; no raw CSV contents, file lists, or secret values
+
+`original_filename` review:
+
+- populated: `353`
+- blank: `0`
+- exists as stored under rehearsal root only: `0`
+- exists after rehearsal mapping: `0`
+- basename seen in archive: `0`
+- unresolved after rehearsal mapping: `353`
+- shape: filename-only `353`
+
+`saved_path` review:
+
+- populated: `353`
+- blank: `0`
+- exists as stored under rehearsal root only: `0`
+- exists after rehearsal mapping: `0`
+- basename seen in archive: `353`
+- unresolved after rehearsal mapping: `353`
+- shape: relative-or-unknown `353`
+
+Saved-path suffix review:
+
+- `phase=19J_saved_path_suffix_review`
+- `mode=read_only_count_only`
+- `sqlite_source_exists=yes`
+- `raw_archive_root_exists=yes`
+- `archive_file_count=563`
+- `archive_unique_basename_count=563`
+- `archive_duplicate_basename_value_count=0`
+- `raw_files_row_count=353`
+- `saved_path_populated=353`
+- `saved_path_blank=0`
+- `basename_exists_in_archive=353`
+- `basename_unique_in_archive=353`
+- `basename_duplicate_in_archive=0`
+- `exact_relative_path_exists=0`
+- `unique_suffix_resolved=353`
+- `ambiguous_suffix_resolved=0`
+- `unresolved_after_suffix_review=0`
+- `unique_suffix_segments_1=353`
+
+Decision: Outcome A - path/reference-shape mapping explanation.
+
+Interpretation:
+
+- The copied raw archive is present and contains `563` files.
+- `raw_files` contains `353` rows.
+- `saved_path` is populated for all `353` `raw_files` rows.
+- `saved_path` does not resolve as stored.
+- `exact_relative_path_exists=0`.
+- All `353` saved-path basenames exist in the copied raw archive.
+- All `353` basename matches are unique.
+- `unique_suffix_resolved=353`.
+- `unresolved_after_suffix_review=0`.
+- Therefore, `referenced_evidence_missing_count=353` is explained by path-shape/path-mapping behavior, not by missing raw evidence files.
+- The original Phase 19I dry-run path check did not understand the stored `saved_path` shape.
+
+Future design requirement:
+
+- Future execute-mode transfer must include explicit safe raw evidence path handling.
+- Do not rely silently on basename-only matching unless uniqueness is proven.
+- The safest later design is likely to preserve original `saved_path` and add or derive a resolved copied/rehearsal archive path during validation/transfer logic.
+- Implementation is not approved in Phase 19J.
+
+Boundaries:
+
+- Execute-mode transfer remains unapproved.
+- Production cutover remains unapproved.
+- No code, tests, helper scripts, temporary logs, data transfer, table reset/truncate, dump, restore, web endpoint, package/site-kit generation, live config change, live SQLite read/mutation, MariaDB application-table writes, runner/collector traffic change, command lifecycle change, Direct `repair_update`, secret exposure, raw CSV exposure, command payload JSON exposure, full config exposure, or full runner GUID exposure occurred.
