@@ -269,6 +269,14 @@ Confirmed:
 - Production data was not mutated.
 - No secrets were printed or recorded.
 
+## Phase 19F database setup follow-up
+
+Phase 19F MariaDB/MySQL rehearsal database setup is documented in `docs/MARIADB_REHEARSAL_DB_SETUP.md`.
+
+Phase 19F uses Option B: controlled MariaDB service and empty rehearsal database preparation on Supermicro. It documents MariaDB `10.11` LTS preference, empty `inventory_rehearsal` and `inventory_rehearsal_restore` databases, scoped `inventory_rehearsal_app` user, privilege boundaries, service health validation, empty DB validation, app-user isolation validation, stop conditions, and cutover-not-approved boundaries.
+
+Phase 19F still does not approve Laravel migrations, app data transfer, SQLite-to-MySQL conversion, real rehearsal `.env`, live `.env`/`APP_URL`/DB driver changes, web endpoint exposure, package/site-kit generation, runner/collector traffic changes, production data mutation, or cutover.
+
 Placeholder example:
 
 ```env
