@@ -41,6 +41,7 @@ Current implemented state:
 - read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
 - read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
 - read-only installer/server preflight command exists: `php artisan inventory:install-preflight`
+- authenticated read-only Portal Setup Wizard MVP page exists at `/setup-wizard`
 - Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`
 - Phase 18A installation productization strategy is documented in `docs/INSTALLATION_PRODUCTIZATION_STRATEGY.md`
 - generated site kit and branch package include bundled `smartctl.exe` support for best-effort SSD health/TBW probing
@@ -517,6 +518,8 @@ Phase 18B safety: it is not an installer and not the portal setup wizard. It doe
 Phase 18B Supermicro validation at `D:\inventory\laravel`: host/path was detected as the approved Supermicro active Laravel host, official package/site-kit generation was allowed only on that host, `APP_URL` used HTTPS and was not placeholder/example or localhost/loopback, Laravel storage/inventory/downloads/raw archive/backup paths were readable and writable, required operational commands and optional package/profile/backup commands were detected, Direct HTTPS was described as small/no-IT transport, collector-share was described as main HQ/multi-PC mode, Setup Wizard MVP was reported as not implemented yet, secrets were not printed, and final result was `WARN`. Expected warnings were `APP_ENV=local`, `APP_DEBUG=true`, pilot/internal hostname, CLI inability to fully prove trusted proxy headers, backup policy/restore rehearsal not verified, and Setup Wizard MVP not implemented.
 
 Phase 18B tests: `Tests\Feature\InstallPreflightCommandTest` passed with 21 tests and 56 assertions. The full Laravel suite passed after implementation with 245 tests and 1061 assertions.
+
+Phase 18C adds an authenticated read-only Portal Setup Wizard MVP at `/setup-wizard`. It guides the seven-step productized setup flow, references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running nested Artisan commands, shows safe existing site/runner/collector counts, explains Direct HTTPS, collector-share, and hybrid deployment modes, links to existing runners/collectors/commands/downloads verification pages, and repeats redaction rules. It does not create users, organization/company schema, sites, tokens, packages, site kits, backups, migrations, runner commands, or production approval, and it does not change runner/collector behavior, Direct HTTPS API contracts, command lifecycle semantics, `.env`, generated artifacts, or secrets.
 
 Operational safety notes:
 

@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\PilotReadinessController;
 use App\Http\Controllers\Admin\RawEvidenceController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RunnerController;
+use App\Http\Controllers\Admin\SetupWizardController;
 use App\Http\Controllers\Admin\StorageHealthController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\HealthController;
@@ -44,6 +45,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/devices/{device}/assignment', [DeviceController::class, 'updateAssignment'])->name('admin.devices.assignment.update');
     Route::get('/inventory-review', [InventoryReviewController::class, 'index'])->name('admin.inventory-review.index');
     Route::get('/pilot-readiness', PilotReadinessController::class)->name('admin.pilot-readiness.index');
+    Route::get('/setup-wizard', SetupWizardController::class)->name('admin.setup-wizard.index');
     Route::get('/changes', [ChangeController::class, 'index'])->name('admin.changes.index');
     Route::get('/storage-health', [StorageHealthController::class, 'index'])->name('admin.storage-health.index');
     Route::get('/classification-rules', [ClassificationRuleController::class, 'index'])->name('admin.classification-rules.index');

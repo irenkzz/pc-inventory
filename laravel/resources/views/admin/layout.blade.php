@@ -974,6 +974,7 @@
                 'label' => 'Operations',
                 'items' => [
                     ['label' => 'Pilot Readiness', 'route' => 'admin.pilot-readiness.index', 'match' => 'admin.pilot-readiness.*'],
+                    ['label' => 'Setup Wizard', 'route' => 'admin.setup-wizard.index', 'match' => 'admin.setup-wizard.*'],
                     ['label' => 'Runners', 'route' => 'admin.runners.index', 'match' => 'admin.runners.*'],
                     ['label' => 'Collectors', 'route' => 'admin.collectors.index', 'match' => 'admin.collectors.*'],
                     ['label' => 'Commands', 'route' => 'admin.commands.index', 'match' => 'admin.commands.*'],
