@@ -91,6 +91,12 @@ Phase 18B Supermicro validation at `D:\inventory\laravel` produced `Result: WARN
 
 Phase 18B validation tests: `Tests\Feature\InstallPreflightCommandTest` passed with 21 tests and 56 assertions. The full Laravel suite passed after implementation with 245 tests and 1061 assertions.
 
+`/setup-wizard` was completed in Phase 18C. It is an authenticated admin portal page and read-only guided setup MVP for productized setup flow review. It shows the seven-step setup flow, safe `APP_URL` / HTTPS labels, existing site/runner/collector counts only, Direct HTTPS / collector-share / hybrid deployment guidance, links to runners, collectors, command queue, and downloads, verification checklists, and a secret-redaction footer. It references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running them.
+
+Phase 18C safety: the page does not create users, sites, tokens, token rotation, per-runner enrollment, packages, site kits, migrations, `.env` changes, production approval, or production data mutations. It does not touch runner or collector files, change Direct HTTPS API contracts, change command lifecycle semantics, enable Direct `repair_update`, or expose secrets. Collector-share remains supported and unaffected.
+
+Phase 18C validation: `Tests\Feature\SetupWizardMvpTest` passed with 8 tests and 52 assertions; the full Laravel suite passed after implementation with 253 tests and 1113 assertions. Manual portal validation confirmed `/setup-wizard` loads for authenticated admin, is clearly read-only and not production/cutover approval, has understandable Direct HTTPS / collector-share / hybrid guidance, includes verification links, and displays no secrets.
+
 ## Endpoint And DNS Failures
 
 Use these checks from the runner machine.

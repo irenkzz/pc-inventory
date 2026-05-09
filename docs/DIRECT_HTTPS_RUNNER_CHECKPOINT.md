@@ -312,6 +312,40 @@ Validation:
 - `Tests\Feature\InstallPreflightCommandTest` passed: 21 tests, 56 assertions.
 - Full Laravel test suite passed after implementation: 245 tests, 1061 assertions.
 
+### Phase 18C - Portal Setup Wizard MVP
+
+Route:
+
+```text
+GET /setup-wizard
+```
+
+Status:
+
+- Implemented, validated on Supermicro, documented.
+- Authenticated admin portal page.
+- Read-only guided setup MVP, not production/cutover approval.
+- Shows seven-step setup flow, safe `APP_URL` / HTTPS labels, existing site/runner/collector counts only, deployment-mode guidance, verification checklists, and secret-redaction footer.
+- Explains Direct HTTPS, collector-share, and hybrid modes.
+- Links to existing runners, collectors, command queue, and downloads pages.
+- References `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running nested Artisan commands.
+- Adds an Operations navigation link.
+
+Safety:
+
+- Does not create users, sites, tokens, token rotation, per-runner enrollment, packages, site kits, migrations, `.env` changes, production approval, or production data mutations.
+- Does not touch runner files or collector files.
+- Does not change Direct HTTPS API contracts or command lifecycle semantics.
+- Direct `repair_update` remains blocked.
+- Collector-share remains supported and unaffected.
+- No secrets are printed or exposed.
+
+Validation:
+
+- `Tests\Feature\SetupWizardMvpTest` passed: 8 tests, 52 assertions.
+- Full Laravel suite passed after implementation: 253 tests, 1113 assertions.
+- Manual portal validation after merge/pull confirmed `/setup-wizard` loads for authenticated admin, read-only and non-cutover wording are clear, mode cards are understandable, verification links are present, and no secrets are displayed.
+
 ## Known Limitations
 
 - Direct `repair_update` is not supported yet.
@@ -329,6 +363,6 @@ Validation:
 4. Run `php artisan inventory:production-readiness` before moving beyond pilot mode.
 5. Run `php artisan inventory:install-preflight` before productized setup/package generation review.
 6. Keep Direct HTTPS rollout focused on small/no-IT sites first.
-7. Plan Phase 18C Portal Setup Wizard MVP.
+7. Phase 18C Portal Setup Wizard MVP is done.
 8. Plan Phase 18D Direct HTTPS Runner Installer MVP and Phase 18E Collector-site Installer MVP.
 9. Later return to MariaDB migration runbook and rehearsal.

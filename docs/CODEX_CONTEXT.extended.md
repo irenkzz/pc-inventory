@@ -46,6 +46,7 @@ Current known package/state:
 - Phase 17A read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
 - Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`
 - Phase 18B read-only installer/server preflight command exists: `php artisan inventory:install-preflight`
+- Phase 18C authenticated read-only Portal Setup Wizard MVP exists at `/setup-wizard`
 - collector-share mode remains supported and unaffected
 
 ## Laravel Responsibilities
@@ -277,6 +278,10 @@ Phase 18B `inventory:install-preflight` is implemented, validated on Supermicro,
 Phase 18B Supermicro validation at `D:\inventory\laravel`: the approved Supermicro host/path was detected, official package/site-kit generation was allowed only there, `APP_URL` used HTTPS and was not placeholder/example or localhost/loopback, storage/downloads/raw archive/backup paths were readable and writable, required and optional operational commands were detected without running nested Artisan commands, Direct HTTPS remained the small/no-IT transport, collector-share remained the main HQ/multi-PC mode, Setup Wizard MVP was reported as not implemented yet, secrets were not printed, and final result was `WARN`. Expected warnings were local/debug pilot state, pilot/internal hostname, trusted proxy headers not fully provable from CLI, backup/restore rehearsal policy not verified, and Setup Wizard MVP not implemented. Tests passed: `Tests\Feature\InstallPreflightCommandTest` 21 tests/56 assertions; full Laravel suite 245 tests/1061 assertions.
 
 Phase 18B safety: it is not an installer and not the portal setup wizard. It does not generate packages, site kits, backups, or tokens; does not mutate database records; does not write files; does not run migrations; does not run nested Artisan commands; does not change `.env`; does not expose secrets; does not change Direct HTTPS API contracts; does not change command lifecycle semantics; and does not enable Direct `repair_update`.
+
+Phase 18C `GET /setup-wizard` is implemented, validated on Supermicro, and documented. It is an authenticated admin portal page and read-only guided setup MVP. It shows the seven-step productized setup flow, safe `APP_URL` / HTTPS labels, existing site/runner/collector counts only, Direct HTTPS / collector-share / hybrid deployment modes, links to existing runners, collectors, command queue, and downloads pages, verification checklists, and a secret-redaction footer. It references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running them, and adds an Operations navigation link.
+
+Phase 18C safety: it does not create users, sites, tokens, token rotation, per-runner enrollment, packages, site kits, migrations, `.env` changes, production approval, or production data mutations. It does not touch runner/collector files, change Direct HTTPS API contracts, change command lifecycle semantics, enable Direct `repair_update`, or expose secrets. Tests passed: `Tests\Feature\SetupWizardMvpTest` 8 tests/52 assertions; full Laravel suite 253 tests/1113 assertions. Manual portal validation confirmed `/setup-wizard` loads for authenticated admin, the page is clearly read-only and not production/cutover approval, mode guidance is understandable, verification links are present, and no secrets are displayed.
 
 ## Runner Rename / GUID Behavior
 

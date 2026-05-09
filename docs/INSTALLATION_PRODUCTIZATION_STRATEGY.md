@@ -133,6 +133,12 @@ A future Portal Setup Wizard should handle the first-use configuration that is c
 
 The wizard should describe operational choices without leaking token values or requiring the operator to understand every Laravel, runner, collector, and reverse proxy detail.
 
+Phase 18C added the Portal Setup Wizard MVP at `GET /setup-wizard`. Status: implemented, validated on Supermicro, documented.
+
+The MVP is an authenticated admin portal page and remains read-only. It shows the seven-step productized setup flow, safe `APP_URL` / HTTPS labels, existing site/runner/collector counts only, Direct HTTPS / collector-share / hybrid deployment-mode guidance, links to existing runners, collectors, command queue, and downloads pages, verification checklists, and a secret-redaction safety footer. It references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running them.
+
+Phase 18C does not create users, sites, tokens, token rotation, per-runner enrollment, packages, site kits, migrations, `.env` changes, production approval, or production data mutations. It does not touch runner/collector files, change Direct HTTPS API contracts, change command lifecycle semantics, or enable Direct `repair_update`.
+
 ## 8. Future Direct HTTPS Runner Installer Responsibilities
 
 A future Direct HTTPS Runner Installer should install a mode-specific runner package and verify that the client can safely talk to the Laravel HTTPS endpoint. Eventual responsibilities include:
@@ -242,10 +248,11 @@ Support summaries should use redacted labels, partial non-secret identifiers, ti
 
 ## 13. Future Phase Roadmap
 
+- Phase 18A - Installation Productization Strategy. Status: done.
 - Phase 18B - Installer/server preflight command. Status: implemented, validated on Supermicro, documented.
-- Phase 18C - Portal Setup Wizard MVP.
-- Phase 18D - Direct HTTPS Runner Installer MVP.
-- Phase 18E - Collector-site Installer MVP.
+- Phase 18C - Portal Setup Wizard MVP. Status: implemented, validated on Supermicro, documented.
+- Phase 18D - Direct HTTPS Runner Installer MVP. Status: next candidate.
+- Phase 18E - Collector-site Installer MVP. Status: after 18D.
 - Then return to MariaDB migration runbook and rehearsal.
 
 The roadmap intentionally keeps setup productization separate from production database migration and cutover approval.
@@ -286,6 +293,7 @@ The roadmap intentionally keeps setup productization separate from production da
 - Risks of over-simplification are documented.
 - Risks of current manual flow are documented.
 - Phase 18B read-only installer/server preflight command is documented.
+- Phase 18C read-only Portal Setup Wizard MVP is documented.
 - No application code is changed.
 - No runner code is changed.
 - No collector code is changed.
