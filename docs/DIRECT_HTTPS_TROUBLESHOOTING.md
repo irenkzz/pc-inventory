@@ -378,6 +378,8 @@ Use `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd` for new installs. It is an additiv
 
 Generated Direct HTTPS packages also include `README_DIRECT_HTTPS_RUNNER.txt`. It documents the flow `Runner on this PC -> Laravel HTTPS portal`, HTTPS/trusted certificate requirements, no plain HTTP, no disabled TLS validation, no `-SkipCertificateCheck`, and that Direct `repair_update` remains blocked for the MVP. Direct HTTPS packages do not expose `INSTALL_COLLECTOR_SITE.cmd` as a top-level entry point.
 
+Phase 18F status: implemented, Supermicro package-validated, documented. Supermicro validation built the Direct HTTPS package with `php artisan inventory:build-site-kit --profile=..\deployment\profiles\site_hq_direct_https.pilot.json`; `inventory:direct-site-kit-audit` returned `WARN` only because `collectorName` is present but not required for Direct HTTPS active transport. Validation confirmed the new launcher, README, Direct HTTPS installer wrapper, Direct HTTPS mode, `https://inventory-pilot.internal.lan`, HTTPS use, runner version `1.0.22`, required README safety wording, and no obvious rendered secret.
+
 Manual wrapper run from an extracted Direct HTTPS package:
 
 ```powershell
