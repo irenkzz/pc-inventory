@@ -419,6 +419,8 @@ Phase 19I implements dry-run-only command `php artisan inventory:mariadb-rehears
 
 Phase 19I Supermicro dry-run validation completed with expected `WARN`. Hard boundaries passed, source SQLite integrity/readability passed, MariaDB target schema was reachable, `inventory_rehearsal_restore` remained empty, main counts/relationships/JSON summaries were produced without secrets, and guardrails failed as expected for missing `--source` and live SQLite source.
 
+Phase 19J is the read-only evidence review phase for the Phase 19I warning `referenced_evidence_missing_count=353`. It documents how to determine whether the warning is caused by path mapping or genuinely missing copied evidence before any execute-mode planning.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:

@@ -668,3 +668,9 @@ Boundary confirmations:
 - No runner/collector/API/command lifecycle behavior changed.
 - Direct `repair_update` remains blocked.
 - No `.env` values, `APP_KEY`, DB credentials, token secrets, token hashes, bearer tokens, raw CSV contents, command payload JSON, full configs, or full runner GUIDs were printed or recorded.
+
+## 29. Phase 19J dry-run evidence review
+
+Phase 19J dry-run evidence review is documented in `docs/MARIADB_REHEARSAL_DRY_RUN_EVIDENCE_REVIEW.md`.
+
+It is read-only and focuses on deciding whether `referenced_evidence_missing_count=353` is a real missing evidence problem or a raw evidence path-mapping problem before any execute-mode planning continues.
