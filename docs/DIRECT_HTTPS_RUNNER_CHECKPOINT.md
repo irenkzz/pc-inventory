@@ -356,7 +356,7 @@ runner/scripts/install_direct_https_runner.ps1
 
 Status:
 
-- Implemented in source; Supermicro package/live-runner validation is still required after reviewed pull.
+- Implemented, live-validated with manual Scheduled Task trigger, documented.
 - PowerShell wrapper for already generated Direct HTTPS runner packages/configs.
 - Requires elevated PowerShell for MVP.
 - Locates or accepts `runner-config.template.json` / `runner-config.json`.
@@ -378,13 +378,26 @@ Safety:
 - Does not trigger `scan_now` or `manual_scan`.
 - Does not print tokens, raw configs, command payloads, `.env` values, `APP_KEY`, or full runner GUIDs.
 - Generated Direct HTTPS site kits include and launch the wrapper; generated collector-share site kits remove the Direct HTTPS-only wrapper.
+- Package inclusion is additive; config schema and token handling are unchanged.
 
 Validation:
 
 - PowerShell parser check passed for `runner/scripts/install_direct_https_runner.ps1`.
 - `tests/powershell/Test-DirectHttpsInstaller.ps1` passed.
-- `Tests\Feature\SiteProfileValidationCommandTest` passed: 17 tests, 103 assertions.
+- `Tests\Feature\SiteProfileValidationCommandTest` passed.
 - `Tests\Feature\DirectSiteKitAuditCommandTest` passed: 8 tests, 46 assertions.
+- Full Laravel test suite passed after implementation: 253 tests, 1125 assertions.
+- Supermicro Direct HTTPS site-kit audit passed with acceptable `WARN`: `collectorName` is present but not required for Direct HTTPS active transport.
+- Direct HTTPS profile validation passed for `..\deployment\profiles\site_hq_direct_https.pilot.json`.
+
+Live runner validation:
+
+- Runner: `LAPTOP-I76TA97E`.
+- Result: passed with manual Scheduled Task trigger.
+- Method: ran the Direct HTTPS installer wrapper from PowerShell, manually triggered the existing Windows Scheduled Task after installation, then verified normal Direct HTTPS heartbeat, poll, upload, portal state, and Supermicro triage.
+- Observed: runner resolved as Direct HTTPS, version `1.0.22`, masked runner GUID only, recent heartbeat, recent direct command poll, populated upload/inventory, latest command succeeded, pending queued commands `0`, delivered awaiting ACK `0`, stale dispatched/no ACK `0`, historical failed command count `0`, likely status `OK`, triage result `PASS`.
+- Direct pilot status after validation: `IT-ADMIN` health `OK` version `1.0.22`; `LAPTOP-I76TA97E` health `OK` version `1.0.22`; Direct `repair_update` remains blocked; collector-share remains unaffected; collector-share runner count `36`.
+- Nuance: the first validation cycle after wrapper install was manually triggered through Task Scheduler. Automatic scheduled interval observation can continue during monitoring; this is not a blocker for Phase 18D MVP acceptance.
 
 ## Known Limitations
 
@@ -404,6 +417,6 @@ Validation:
 5. Run `php artisan inventory:install-preflight` before productized setup/package generation review.
 6. Keep Direct HTTPS rollout focused on small/no-IT sites first.
 7. Phase 18C Portal Setup Wizard MVP is done.
-8. Pull reviewed Phase 18D source on Supermicro, run `inventory:install-preflight`, `inventory:direct-site-kit-audit`, and Laravel tests, then validate an official Direct HTTPS test package on a runner PC.
+8. Phase 18D Direct HTTPS Runner Installer MVP is done; continue normal scheduled-interval monitoring for Direct HTTPS runners.
 9. Plan Phase 18E Collector-site Installer MVP.
 10. Later return to MariaDB migration runbook and rehearsal.

@@ -350,6 +350,8 @@ Do not re-enable collector while validating Direct HTTPS.
 
 Phase 18D adds `runner/scripts/install_direct_https_runner.ps1` for Direct HTTPS runner packages. Use it only with already generated Direct HTTPS runner configs.
 
+Status: implemented, live-validated with manual Scheduled Task trigger, documented.
+
 Expected behavior:
 
 - Requires elevated PowerShell.
@@ -386,6 +388,18 @@ C:\ProgramData\InternalInventoryRunner\config\runner-config.json
 ```
 
 Do not paste installer logs that contain raw configs. Support summaries should include only runner ID, transport mode, version, server URL, masked runner GUID suffix, Scheduled Task status, HTTPS health result, and log path.
+
+Validation notes:
+
+- PowerShell parser check and `tests/powershell/Test-DirectHttpsInstaller.ps1` passed.
+- Targeted package/audit tests passed: `php artisan test --filter=SiteProfileValidationCommandTest` and `php artisan test --filter=DirectSiteKitAuditCommandTest`.
+- Full Laravel suite passed after implementation: 253 tests, 1125 assertions.
+- Supermicro Direct HTTPS site-kit audit passed with acceptable `WARN` because `collectorName` is present but not required for Direct HTTPS active transport.
+- Direct HTTPS profile validation passed for `..\deployment\profiles\site_hq_direct_https.pilot.json`.
+- Live runner validation passed on `LAPTOP-I76TA97E` after manually triggering the existing Windows Scheduled Task once after wrapper installation.
+- Supermicro triage for `LAPTOP-I76TA97E` reported recent heartbeat, recent direct poll, populated upload/inventory, zero pending queued commands, zero delivered awaiting ACK, zero stale dispatched/no ACK, zero historical failed commands, likely status `OK`, and `Result: PASS`.
+
+The manual first trigger is a validation nuance, not a Phase 18D MVP blocker. Continue observing the automatic scheduled interval during normal monitoring.
 
 ## Portal Checklist
 
