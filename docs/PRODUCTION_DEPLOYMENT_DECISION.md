@@ -19,6 +19,8 @@ Follow-up: Phase 19A documents the MariaDB/MySQL migration dry-run and restore r
 
 Phase 19B follow-up documents rehearsal environment preparation in `docs/MARIADB_REHEARSAL_ENVIRONMENT_PREP.md`, recommending a separate Supermicro rehearsal path at `D:\inventory-rehearsal` and local-only rehearsal binding before any dry-run migration is executed.
 
+Phase 19C follow-up documents the filesystem-only rehearsal setup checklist in `docs/MARIADB_REHEARSAL_ENVIRONMENT_SETUP_CHECKLIST.md`. It is still pre-migration planning and does not approve MariaDB/MySQL installation, DB/user creation, migrations, data transfer, web binding, live `.env` changes, or cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
