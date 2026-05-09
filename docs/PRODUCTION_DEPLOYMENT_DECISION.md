@@ -17,6 +17,8 @@ Phase 17B does not execute a production migration, change `.env`, mutate product
 
 Follow-up: Phase 19A documents the MariaDB/MySQL migration dry-run and restore rehearsal process in `docs/MARIADB_MIGRATION_DRY_RUN_RUNBOOK.md`. It remains documentation-only and does not approve production migration, live `.env` changes, DB driver switching, or cutover.
 
+Phase 19B follow-up documents rehearsal environment preparation in `docs/MARIADB_REHEARSAL_ENVIRONMENT_PREP.md`, recommending a separate Supermicro rehearsal path at `D:\inventory-rehearsal` and local-only rehearsal binding before any dry-run migration is executed.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
