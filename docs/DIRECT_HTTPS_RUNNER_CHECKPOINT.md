@@ -53,6 +53,7 @@ Runner → sends ACK to Laravel
 - Read-only site-kit audit command: `php artisan inventory:direct-site-kit-audit`
 - Read-only runner triage command: `php artisan inventory:direct-runner-triage {runnerId}`
 - Read-only production readiness checklist command: `php artisan inventory:production-readiness`
+- Read-only installer/server preflight command: `php artisan inventory:install-preflight`
 - Tests are self-contained with fixtures
 
 ### Runner
@@ -100,6 +101,7 @@ Runner → sends ACK to Laravel
 - Direct `repair_update` is blocked for MVP.
 - Collector-share mode remains supported and unaffected.
 - Do not print token secrets, bearer tokens, token hashes, DB credentials, Google credentials, or raw CSV contents.
+- Do not print `.env` values, `APP_KEY` values, command payload JSON, full configs, or full runner GUIDs.
 
 ## Validated Pilot Result
 
@@ -266,6 +268,50 @@ Validation:
 - `Tests\Feature\ProductionReadinessCommandTest` passed: 16 tests, 61 assertions.
 - Full Laravel test suite previously passed after implementation: 224 tests, 1005 assertions.
 
+### Phase 18B - Installer/server Preflight Command
+
+Command:
+
+```powershell
+php artisan inventory:install-preflight
+```
+
+Status:
+
+- Implemented, validated on Supermicro, documented.
+- Laravel-only read-only Artisan command for future productized installation, setup wizard, and package/site-kit generation flows.
+- Checks Environment, Laravel Host, Application URL / HTTPS, Storage and Package Paths, Operational Commands, Package / Site-kit Generation Safety, Direct HTTPS Productization Notes, Collector-share Productization Notes, Setup Wizard Readiness, MVP Manual Boundaries, Security / Secret Redaction, Recommended Next Checks, and Result.
+- Not an installer and not the portal setup wizard.
+- Does not generate packages, site kits, backups, or tokens.
+- Does not mutate database records, write files, run migrations, run nested Artisan commands, change `.env`, or expose secrets.
+
+Supermicro validation at `D:\inventory\laravel`:
+
+- Host/path appeared as the approved Supermicro active Laravel host.
+- Official package/site-kit generation was allowed on the approved Supermicro host.
+- `APP_URL` used HTTPS and was not placeholder/example or localhost/loopback.
+- Laravel storage, inventory storage root, downloads/site-kit path, raw archive path, and backup path were readable and writable.
+- Required operational commands were registered: `inventory:doctor`, `inventory:direct-pilot-status`, `inventory:direct-site-kit-audit`, `inventory:direct-runner-triage`, and `inventory:production-readiness`.
+- Optional commands were detected: `inventory:build-site-kit`, `inventory:prepare-site-profile`, `inventory:validate-site-profile`, and `inventory:backup`.
+- Nested Artisan commands were not run, no packages/site kits/backups/tokens were generated, and secrets were not printed.
+- Direct HTTPS was described as small/no-IT transport; collector-share was described as the main HQ/multi-PC mode.
+- Portal Setup Wizard MVP was reported as not implemented yet.
+- Final result: `WARN`.
+
+Expected current warnings:
+
+- `APP_ENV=local`.
+- `APP_DEBUG=true`.
+- `APP_URL` uses pilot/internal hostname.
+- Trusted proxy / forwarded HTTPS headers cannot be fully proven from CLI.
+- Backup policy and restore rehearsal are not verified by this command.
+- Portal Setup Wizard MVP is not implemented yet.
+
+Validation:
+
+- `Tests\Feature\InstallPreflightCommandTest` passed: 21 tests, 56 assertions.
+- Full Laravel test suite passed after implementation: 245 tests, 1061 assertions.
+
 ## Known Limitations
 
 - Direct `repair_update` is not supported yet.
@@ -281,7 +327,8 @@ Validation:
 2. Audit generated Direct HTTPS artifacts with `php artisan inventory:direct-site-kit-audit` before installing more pilot runners.
 3. Triage individual Direct HTTPS runners with `php artisan inventory:direct-runner-triage {runnerId}`.
 4. Run `php artisan inventory:production-readiness` before moving beyond pilot mode.
-5. Keep Direct HTTPS rollout focused on small/no-IT sites first.
-6. Plan token rotation UI.
-7. Plan per-runner token enrollment.
-8. Later evaluate direct `repair_update` support.
+5. Run `php artisan inventory:install-preflight` before productized setup/package generation review.
+6. Keep Direct HTTPS rollout focused on small/no-IT sites first.
+7. Plan Phase 18C Portal Setup Wizard MVP.
+8. Plan Phase 18D Direct HTTPS Runner Installer MVP and Phase 18E Collector-site Installer MVP.
+9. Later return to MariaDB migration runbook and rehearsal.

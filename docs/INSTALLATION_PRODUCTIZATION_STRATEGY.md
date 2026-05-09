@@ -183,12 +183,19 @@ Future installer and wizard checks may reuse or align with existing operational 
 
 ```powershell
 php artisan inventory:doctor
+php artisan inventory:install-preflight
 php artisan inventory:production-readiness
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage {runnerId}
 ```
 
 The productized setup should present these checks in portal or installer language while keeping the CLI available for diagnostics and recovery.
+
+Phase 18B added `php artisan inventory:install-preflight` as the first server-side preflight for this productization path. It is a Laravel-only read-only Artisan command that checks Environment, Laravel Host, Application URL / HTTPS, Storage and Package Paths, Operational Commands, Package / Site-kit Generation Safety, Direct HTTPS and collector-share notes, Setup Wizard readiness, MVP manual boundaries, Security / Secret Redaction, Recommended Next Checks, and Result.
+
+The command is not an installer and is not the portal setup wizard. It does not generate packages, site kits, backups, or tokens; it does not mutate database records, write files, run migrations, run nested Artisan commands, change `.env`, or expose secrets.
+
+Supermicro validation at `D:\inventory\laravel` produced `Result: WARN` with expected current warnings for `APP_ENV=local`, `APP_DEBUG=true`, pilot/internal `APP_URL`, CLI inability to fully prove trusted proxy headers, unverified backup/restore rehearsal policy, and the not-yet-implemented Portal Setup Wizard MVP. The approved Supermicro host/path was detected, HTTPS `APP_URL` was accepted, storage/downloads/raw archive/backup paths were readable and writable, required and optional operational commands were detected, and no packages, site kits, backups, or tokens were generated.
 
 ## 11. MVP Manual Boundaries
 
@@ -235,7 +242,7 @@ Support summaries should use redacted labels, partial non-secret identifiers, ti
 
 ## 13. Future Phase Roadmap
 
-- Phase 18B - Installer/server preflight command.
+- Phase 18B - Installer/server preflight command. Status: implemented, validated on Supermicro, documented.
 - Phase 18C - Portal Setup Wizard MVP.
 - Phase 18D - Direct HTTPS Runner Installer MVP.
 - Phase 18E - Collector-site Installer MVP.
@@ -278,6 +285,7 @@ The roadmap intentionally keeps setup productization separate from production da
 - Phase 18B-18E roadmap is documented.
 - Risks of over-simplification are documented.
 - Risks of current manual flow are documented.
+- Phase 18B read-only installer/server preflight command is documented.
 - No application code is changed.
 - No runner code is changed.
 - No collector code is changed.
@@ -293,7 +301,7 @@ The roadmap intentionally keeps setup productization separate from production da
 
 - No installer implementation.
 - No portal setup wizard implementation.
-- No server preflight command yet.
+- No installer behavior beyond the read-only server preflight command.
 - No runner installer changes.
 - No collector installer changes.
 - No MariaDB migration execution.
