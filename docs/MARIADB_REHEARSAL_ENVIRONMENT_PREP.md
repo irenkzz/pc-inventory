@@ -50,6 +50,8 @@ Phase 19D follow-up: `tools/Prepare-MariaDbRehearsalFilesystem.ps1` is an option
 
 Phase 19D Supermicro validation completed with expected `WARN` for both dry-run and `-Execute`. The execution created `D:\inventory-rehearsal`, copied the rehearsal Laravel source, created `.env.rehearsal.example`, created non-secret setup notes, and skipped SQLite/raw archive/download copies because no optional copy inputs were supplied.
 
+Phase 19E completed the verified SQLite source and evidence copy into the rehearsal filesystem with expected `WARN`. The verified SQLite backup now exists at `D:\inventory-rehearsal\source-copy\database.sqlite`, is read-only, has size `5,910,528` bytes, and passed SQLite integrity check `ok` via PHP/PDO because `sqlite3` CLI was unavailable. Raw archive and downloads/site kits were copied to their rehearsal paths; no MariaDB/MySQL install, DB/user creation, migrations, data transfer, real `.env`, live `.env`/`APP_URL` change, package generation, runner/collector traffic change, production data mutation, or secret exposure occurred.
+
 ## 3. Recommended rehearsal environment layout
 
 Recommended layout: same Supermicro host with a separate Laravel copy/path.
