@@ -40,6 +40,7 @@ Current implemented state:
 - read-only Direct HTTPS site-kit audit command exists: `php artisan inventory:direct-site-kit-audit`
 - read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
 - read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
+- read-only installer/server preflight command exists: `php artisan inventory:install-preflight`
 - Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`
 - Phase 18A installation productization strategy is documented in `docs/INSTALLATION_PRODUCTIZATION_STRATEGY.md`
 - generated site kit and branch package include bundled `smartctl.exe` support for best-effort SSD health/TBW probing
@@ -507,6 +508,8 @@ Phase 17A tests:
 - Full Laravel test suite previously passed after implementation: 224 tests, 1005 assertions.
 
 Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`. It is planning/documentation only, not cutover approval. It keeps SQLite pilot-only, recommends MariaDB/MySQL on Supermicro as the production DB target, recommends IIS + PHP FastCGI for Windows production serving, keeps HPE StoreEasy as TLS termination reverse proxy for now, and requires backup plus restore testing before production cutover. It does not change code, runner/collector behavior, API contracts, command semantics, Direct `repair_update`, token UI, production data, `.env`, or generated artifacts.
+
+Phase 18B adds `php artisan inventory:install-preflight`, a Laravel-only read-only preflight for future productized installation/setup/package flows. It checks host/path identity, APP_URL/HTTPS readiness, storage and package paths, operational command availability, Supermicro-only official package/site-kit generation safety, setup wizard readiness notes, MVP manual boundaries, and secret-redaction rules. It does not run nested Artisan commands, migrations, backups, package/site-kit generation, token registration/rotation, runner commands, or Direct HTTPS API changes.
 
 Operational safety notes:
 
