@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use PDO;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Tests\TestCase;
 
@@ -16,7 +19,11 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertArrayHasKey('inventory:mariadb-rehearsal-transfer', $commands);
         $this->assertTrue($commands['inventory:mariadb-rehearsal-transfer']->getDefinition()->hasOption('source'));
         $this->assertTrue($commands['inventory:mariadb-rehearsal-transfer']->getDefinition()->hasOption('dry-run'));
+        $this->assertTrue($commands['inventory:mariadb-rehearsal-transfer']->getDefinition()->hasOption('readiness'));
+        $this->assertTrue($commands['inventory:mariadb-rehearsal-transfer']->getDefinition()->hasOption('dump-marker'));
         $this->assertFalse($commands['inventory:mariadb-rehearsal-transfer']->getDefinition()->hasOption('execute'));
+        $this->assertFalse($commands['inventory:mariadb-rehearsal-transfer']->getDefinition()->hasOption('confirm-execute'));
+        $this->assertFalse($commands['inventory:mariadb-rehearsal-transfer']->getDefinition()->hasOption('force-execute'));
     }
 
     public function test_command_requires_dry_run(): void
@@ -39,6 +46,15 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertSame(1, $exitCode);
         $this->assertStringContainsString('[FAIL] --source is required and must be explicit.', $output);
         $this->assertStringContainsString('Result: FAIL', $output);
+    }
+
+    public function test_command_with_no_mode_fails_closed(): void
+    {
+        [$exitCode, $output] = $this->runCommand([]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('--dry-run is required. This command is dry-run-only.', $output);
+        $this->assertStringContainsString('--source is required and must be explicit.', $output);
     }
 
     public function test_command_refuses_live_sqlite_path(): void
@@ -174,12 +190,642 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertStringNotContainsString('update(', $source);
     }
 
+    public function test_readiness_requires_dry_run(): void
+    {
+        [$exitCode, $output] = $this->runCommand([
+            '--readiness' => true,
+            '--source' => 'D:\\inventory-rehearsal\\source-copy\\database.sqlite',
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('--readiness requires --dry-run.', $output);
+        $this->assertStringContainsString('Result: FAIL', $output);
+    }
+
+    public function test_readiness_requires_explicit_source(): void
+    {
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('--source is required and must be explicit.', $output);
+        $this->assertStringContainsString('Result: FAIL', $output);
+    }
+
+    public function test_dry_run_readiness_passes_read_only_fixture_with_expected_warnings(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('mode=dry_run_execute_readiness', $output);
+        $this->assertStringContainsString('writes_performed=no', $output);
+        $this->assertStringContainsString('execute_option_available=no', $output);
+        $this->assertStringContainsString('target_reset_performed=no', $output);
+        $this->assertStringContainsString('dump_created=no', $output);
+        $this->assertStringContainsString('restore_performed=no', $output);
+        $this->assertStringContainsString('execute_approved=no', $output);
+        $this->assertStringContainsString('target_empty_state=PASS', $output);
+        $this->assertStringContainsString('dump_marker_supplied=yes', $output);
+        $this->assertStringContainsString('dump_marker_under_approved_directory=yes', $output);
+        $this->assertStringContainsString('dump_marker_exists=yes', $output);
+        $this->assertStringContainsString('dump_marker_nonzero=yes', $output);
+        $this->assertStringContainsString('classification_rules_action=preserve_target_skip_import', $output);
+        $this->assertStringContainsString('classification_rules_write_attempted=no', $output);
+        $this->assertStringContainsString('suffix_resolved_count=1', $output);
+        $this->assertStringContainsString('ambiguous_count=0', $output);
+        $this->assertStringContainsString('unresolved_count=0', $output);
+        $this->assertStringContainsString('raw_filenames_printed=no', $output);
+        $this->assertStringContainsString('raw_file_lists_printed=no', $output);
+        $this->assertStringContainsString('raw_contents_printed=no', $output);
+        $this->assertStringContainsString('resolved_paths_stored=no', $output);
+        $this->assertStringContainsString('optional_table=site_tokens action=skip_absent_in_both', $output);
+        $this->assertStringContainsString('Result: WARN', $output);
+        $this->assertStringNotContainsString('evidence-one.csv', $output);
+        $this->assertStringNotContainsString($fixture['rawArchive'], $output);
+    }
+
+    public function test_readiness_missing_dump_marker_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('dump_marker_supplied=no', $output);
+        $this->assertStringContainsString('--dump-marker is required with --readiness.', $output);
+    }
+
+    public function test_readiness_dump_marker_outside_approved_directory_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        $outside = $fixture['root'] . DIRECTORY_SEPARATOR . 'outside.marker';
+        file_put_contents($outside, 'marker');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $outside,
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('dump_marker_under_approved_directory=no', $output);
+        $this->assertStringContainsString('Dump marker is outside approved MariaDB dump directory.', $output);
+    }
+
+    public function test_readiness_dump_marker_path_traversal_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        $traversal = $fixture['dumpDir'] . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'escape.marker';
+        file_put_contents($fixture['root'] . DIRECTORY_SEPARATOR . 'escape.marker', 'marker');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $traversal,
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('dump_marker_under_approved_directory=no', $output);
+    }
+
+    public function test_readiness_missing_and_zero_byte_dump_marker_fail(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        $missing = $fixture['dumpDir'] . DIRECTORY_SEPARATOR . 'missing.marker';
+
+        [$missingExit, $missingOutput] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $missing,
+        ]);
+
+        $this->assertSame(1, $missingExit);
+        $this->assertStringContainsString('dump_marker_exists=no', $missingOutput);
+
+        $zero = $fixture['dumpDir'] . DIRECTORY_SEPARATOR . 'zero.marker';
+        touch($zero);
+
+        [$zeroExit, $zeroOutput] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $zero,
+        ]);
+
+        $this->assertSame(1, $zeroExit);
+        $this->assertStringContainsString('dump_marker_nonzero=no', $zeroOutput);
+    }
+
+    public function test_readiness_fails_when_domain_target_rows_exist(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        DB::table('devices')->insert(['id' => 99]);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Target application/domain table is not empty: devices', $output);
+        $this->assertStringContainsString('target_empty_state=FAIL', $output);
+        $this->assertStringContainsString('target_reset_attempted=no', $output);
+    }
+
+    public function test_readiness_fails_when_runner_commands_target_rows_exist(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        DB::table('runner_commands')->insert(['id' => 99]);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Target application/domain table is not empty: runner_commands', $output);
+    }
+
+    public function test_readiness_allows_migrations_and_matching_classification_rules(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('target_migrations_rows=18', $output);
+        $this->assertStringContainsString('target_classification_rules_rows=8', $output);
+        $this->assertStringContainsString('classification_rules_safe_identifier_match=yes', $output);
+        $this->assertStringContainsString('classification_rules_safe_checksum_match=yes', $output);
+    }
+
+    public function test_readiness_fails_on_classification_rule_checksum_mismatch(): void
+    {
+        $fixture = $this->makeReadinessFixture(classificationTargetSuffix: 'different');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('classification_rules_safe_checksum_match=no', $output);
+        $this->assertStringContainsString('classification_rules source/target comparison mismatch.', $output);
+        $this->assertStringNotContainsString('different', $output);
+    }
+
+    public function test_readiness_fails_when_classification_rules_source_present_target_zero(): void
+    {
+        $fixture = $this->makeReadinessFixture(classificationTargetRows: 0);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('classification_rules source has rows while target has none.', $output);
+    }
+
+    public function test_readiness_fails_when_classification_rules_target_present_source_zero(): void
+    {
+        $fixture = $this->makeReadinessFixture(classificationSourceRows: 0);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('classification_rules target has rows while source has none.', $output);
+    }
+
+    public function test_readiness_raw_evidence_duplicate_basename_without_unique_suffix_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture(duplicateRawBasename: true);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('ambiguous_count=1', $output);
+        $this->assertStringContainsString('Raw evidence path mapping readiness failed.', $output);
+        $this->assertStringNotContainsString('evidence-one.csv', $output);
+    }
+
+    public function test_readiness_raw_evidence_missing_candidate_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture(skipRawArchiveFile: true);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('unresolved_count=1', $output);
+    }
+
+    public function test_readiness_raw_hash_mismatch_fails_when_hash_is_available(): void
+    {
+        $fixture = $this->makeReadinessFixture(rawHash: str_repeat('a', 64));
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('hash_checked_count=1', $output);
+        $this->assertStringContainsString('hash_mismatch_count=1', $output);
+    }
+
+    public function test_readiness_optional_table_present_in_source_missing_target_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture(sourceSiteTokens: true);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Optional table present in source but missing in target: site_tokens', $output);
+    }
+
+    public function test_readiness_optional_table_absent_source_target_rows_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture(targetSiteTokens: true);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Optional table absent in source but target has rows: site_tokens', $output);
+    }
+
+    public function test_readiness_known_missing_optional_columns_warn_and_skip(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('known_optional_column=raw_files.device_scan_id present=no action=skip_known_optional_missing', $output);
+        $this->assertStringContainsString('known_optional_column=raw_files.device_id present=no action=skip_known_optional_missing', $output);
+        $this->assertStringContainsString('known_optional_column=storage_health_observations.raw_json present=no action=skip_known_optional_missing', $output);
+    }
+
+    public function test_readiness_missing_migrations_table_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Schema::drop('migrations');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Required migrated target table missing: migrations', $output);
+    }
+
+    public function test_readiness_incomplete_migration_state_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        DB::table('migrations')->where('id', '>', 1)->delete();
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Target migration state is incomplete for execute-readiness.', $output);
+    }
+
+    public function test_readiness_non_empty_restore_database_fails_without_writing_to_it(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Config::set('inventory.mariadb_rehearsal.restore_database_exists', true);
+        Config::set('inventory.mariadb_rehearsal.restore_database_table_count', 1);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('inventory_rehearsal_restore is not empty.', $output);
+    }
+
+    public function test_readiness_does_not_change_target_row_counts(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        $before = $this->targetSnapshotCounts();
+
+        [$exitCode] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $after = $this->targetSnapshotCounts();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame($before, $after);
+    }
+
     private function setRehearsalBoundaryConfig(): void
     {
         $this->app->setBasePath('D:\\inventory-rehearsal\\laravel');
         Config::set('database.default', 'mysql');
         Config::set('database.connections.mysql.database', 'inventory_rehearsal');
         Config::set('app.url', 'http://127.0.0.1:8090');
+    }
+
+    /**
+     * @return array{root: string, source: string, rawArchive: string, downloads: string, dumpDir: string, dump: string}
+     */
+    private function makeReadinessFixture(
+        int $classificationSourceRows = 8,
+        int $classificationTargetRows = 8,
+        string $classificationTargetSuffix = '',
+        bool $duplicateRawBasename = false,
+        bool $skipRawArchiveFile = false,
+        ?string $rawHash = null,
+        bool $sourceSiteTokens = false,
+        bool $targetSiteTokens = false,
+    ): array {
+        $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phase19l_' . bin2hex(random_bytes(6));
+        $source = $root . DIRECTORY_SEPARATOR . 'source-copy' . DIRECTORY_SEPARATOR . 'database.sqlite';
+        $rawArchive = $root . DIRECTORY_SEPARATOR . 'raw_archive';
+        $downloads = $root . DIRECTORY_SEPARATOR . 'downloads';
+        $dumpDir = $root . DIRECTORY_SEPARATOR . 'backups' . DIRECTORY_SEPARATOR . 'mariadb_dumps';
+        $dump = $dumpDir . DIRECTORY_SEPARATOR . 'empty-schema.marker';
+
+        mkdir(dirname($source), 0777, true);
+        mkdir($rawArchive, 0777, true);
+        mkdir($downloads, 0777, true);
+        mkdir($dumpDir, 0777, true);
+        file_put_contents($dump, 'non-secret dump marker');
+        if (! $skipRawArchiveFile) {
+            file_put_contents($rawArchive . DIRECTORY_SEPARATOR . 'evidence-one.csv', 'redacted');
+        }
+        if ($duplicateRawBasename) {
+            mkdir($rawArchive . DIRECTORY_SEPARATOR . 'a', 0777, true);
+            mkdir($rawArchive . DIRECTORY_SEPARATOR . 'b', 0777, true);
+            file_put_contents($rawArchive . DIRECTORY_SEPARATOR . 'a' . DIRECTORY_SEPARATOR . 'evidence-one.csv', 'redacted-a');
+            file_put_contents($rawArchive . DIRECTORY_SEPARATOR . 'b' . DIRECTORY_SEPARATOR . 'evidence-one.csv', 'redacted-b');
+        }
+
+        $this->app->setBasePath($root . DIRECTORY_SEPARATOR . 'laravel');
+        Config::set('inventory.mariadb_rehearsal.expected_base_path', $root . DIRECTORY_SEPARATOR . 'laravel');
+        Config::set('inventory.mariadb_rehearsal.expected_source_path', $source);
+        Config::set('inventory.mariadb_rehearsal.raw_archive_path', $rawArchive);
+        Config::set('inventory.mariadb_rehearsal.downloads_path', $downloads);
+        Config::set('inventory.mariadb_rehearsal.dump_directory', $dumpDir);
+        Config::set('inventory.mariadb_rehearsal.target_database', ':memory:');
+        Config::set('database.default', 'mysql');
+        Config::set('database.connections.mysql', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+        ]);
+        Config::set('app.url', 'http://127.0.0.1:8090');
+        DB::purge('mysql');
+        DB::reconnect('mysql');
+
+        $this->createSourceSqlite($source, $classificationSourceRows, $rawHash, $sourceSiteTokens);
+        $this->createTargetSchema($classificationTargetRows, $classificationTargetSuffix, $targetSiteTokens);
+
+        return compact('root', 'source', 'rawArchive', 'downloads', 'dumpDir', 'dump');
+    }
+
+    private function createSourceSqlite(string $source, int $classificationRows, ?string $rawHash, bool $sourceSiteTokens): void
+    {
+        $pdo = new PDO('sqlite:' . $source);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        foreach ([
+            'users',
+            'collector_sites',
+            'devices',
+            'device_identities',
+            'device_scans',
+            'hardware_snapshots',
+            'storage_health_observations',
+            'network_observations',
+            'peripherals',
+            'device_assignments',
+            'raw_files',
+            'change_log',
+            'collectors',
+            'runners',
+            'runner_commands',
+        ] as $table) {
+            $pdo->exec("CREATE TABLE {$table} (id INTEGER PRIMARY KEY)");
+        }
+
+        $pdo->exec('ALTER TABLE device_identities ADD COLUMN device_id INTEGER');
+        $pdo->exec('ALTER TABLE device_scans ADD COLUMN device_id INTEGER');
+        $pdo->exec('ALTER TABLE hardware_snapshots ADD COLUMN device_scan_id INTEGER');
+        $pdo->exec('ALTER TABLE hardware_snapshots ADD COLUMN snapshot_json TEXT');
+        $pdo->exec('ALTER TABLE storage_health_observations ADD COLUMN device_id INTEGER');
+        $pdo->exec('ALTER TABLE storage_health_observations ADD COLUMN device_scan_id INTEGER');
+        $pdo->exec('ALTER TABLE storage_health_observations ADD COLUMN risk_level TEXT');
+        $pdo->exec('ALTER TABLE storage_health_observations ADD COLUMN risk_reasons TEXT');
+        $pdo->exec('ALTER TABLE network_observations ADD COLUMN device_scan_id INTEGER');
+        $pdo->exec('ALTER TABLE peripherals ADD COLUMN device_scan_id INTEGER');
+        $pdo->exec('ALTER TABLE device_assignments ADD COLUMN device_id INTEGER');
+        $pdo->exec('ALTER TABLE device_assignments ADD COLUMN department TEXT');
+        $pdo->exec('ALTER TABLE device_assignments ADD COLUMN location TEXT');
+        $pdo->exec('ALTER TABLE device_assignments ADD COLUMN room TEXT');
+        $pdo->exec('ALTER TABLE change_log ADD COLUMN device_id INTEGER');
+        $pdo->exec('ALTER TABLE raw_files ADD COLUMN saved_path TEXT');
+        $pdo->exec('ALTER TABLE raw_files ADD COLUMN raw_hash TEXT');
+        $pdo->exec('ALTER TABLE raw_files ADD COLUMN metadata_json TEXT');
+        $pdo->exec('ALTER TABLE collectors ADD COLUMN site_id TEXT');
+        $pdo->exec('ALTER TABLE collectors ADD COLUMN raw_status_json TEXT');
+        $pdo->exec('ALTER TABLE runners ADD COLUMN site_id TEXT');
+        $pdo->exec('ALTER TABLE runners ADD COLUMN runner_id TEXT');
+        $pdo->exec('ALTER TABLE runners ADD COLUMN transport_mode TEXT');
+        $pdo->exec('ALTER TABLE runners ADD COLUMN raw_state_json TEXT');
+        $pdo->exec('ALTER TABLE runner_commands ADD COLUMN runner_id TEXT');
+        $pdo->exec('ALTER TABLE runner_commands ADD COLUMN status TEXT');
+        $pdo->exec('ALTER TABLE runner_commands ADD COLUMN acknowledged_at TEXT');
+        $pdo->exec('ALTER TABLE runner_commands ADD COLUMN result_upload_id INTEGER');
+        $pdo->exec('ALTER TABLE runner_commands ADD COLUMN payload_json TEXT');
+        $pdo->exec('ALTER TABLE collector_sites ADD COLUMN site_id TEXT');
+
+        $pdo->exec("INSERT INTO users (id) VALUES (1)");
+        $pdo->exec("INSERT INTO collector_sites (id, site_id) VALUES (1, 'SITE-HQ')");
+        $pdo->exec("INSERT INTO devices (id) VALUES (1)");
+        $pdo->exec("INSERT INTO device_identities (id, device_id) VALUES (1, 1)");
+        $pdo->exec("INSERT INTO device_scans (id, device_id) VALUES (1, 1)");
+        $pdo->exec("INSERT INTO hardware_snapshots (id, device_scan_id, snapshot_json) VALUES (1, 1, '{}')");
+        $pdo->exec("INSERT INTO storage_health_observations (id, device_id, device_scan_id, risk_level, risk_reasons) VALUES (1, 1, 1, 'low', '[]')");
+        $pdo->exec("INSERT INTO network_observations (id, device_scan_id) VALUES (1, 1)");
+        $pdo->exec("INSERT INTO peripherals (id, device_scan_id) VALUES (1, 1)");
+        $pdo->exec("INSERT INTO device_assignments (id, device_id, department, location, room) VALUES (1, 1, 'IT', 'HQ', '101')");
+        $pdo->exec("INSERT INTO change_log (id, device_id) VALUES (1, 1)");
+        $stmt = $pdo->prepare('INSERT INTO raw_files (id, saved_path, raw_hash, metadata_json) VALUES (1, ?, ?, ?)');
+        $stmt->execute(['archive/evidence-one.csv', $rawHash ?? '', '{}']);
+        $pdo->exec("INSERT INTO collectors (id, site_id, raw_status_json) VALUES (1, 'SITE-HQ', '{}')");
+        $pdo->exec("INSERT INTO runners (id, site_id, runner_id, transport_mode, raw_state_json) VALUES (1, 'SITE-HQ', 'RUNNER-ONE', 'direct_https', '{}')");
+        $pdo->exec("INSERT INTO runner_commands (id, runner_id, status, acknowledged_at, result_upload_id, payload_json) VALUES (1, 'RUNNER-ONE', 'succeeded', '2026-05-10 00:00:00', 1, '{}')");
+
+        $pdo->exec('CREATE TABLE classification_rules (id INTEGER PRIMARY KEY, key TEXT, pattern TEXT, created_at TEXT, updated_at TEXT)');
+        for ($i = 1; $i <= $classificationRows; $i++) {
+            $stmt = $pdo->prepare('INSERT INTO classification_rules (id, key, pattern, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$i, 'rule-' . $i, 'class-' . $i, '2026-05-10', '2026-05-10']);
+        }
+
+        if ($sourceSiteTokens) {
+            $pdo->exec('CREATE TABLE site_tokens (id INTEGER PRIMARY KEY, token_hash TEXT)');
+            $pdo->exec("INSERT INTO site_tokens (id, token_hash) VALUES (1, 'redacted')");
+        }
+    }
+
+    private function createTargetSchema(int $classificationRows, string $classificationSuffix, bool $targetSiteTokens): void
+    {
+        Schema::dropAllTables();
+        foreach ([
+            'migrations',
+            'users',
+            'collector_sites',
+            'devices',
+            'device_identities',
+            'device_scans',
+            'hardware_snapshots',
+            'storage_health_observations',
+            'network_observations',
+            'peripherals',
+            'device_assignments',
+            'raw_files',
+            'change_log',
+            'collectors',
+            'runners',
+            'runner_commands',
+            'personal_access_tokens',
+            'password_reset_tokens',
+            'jobs',
+            'failed_jobs',
+            'cache',
+            'sessions',
+        ] as $table) {
+            Schema::create($table, function ($blueprint): void {
+                $blueprint->integer('id')->primary();
+            });
+        }
+
+        Schema::create('classification_rules', function ($blueprint): void {
+            $blueprint->integer('id')->primary();
+            $blueprint->string('key')->nullable();
+            $blueprint->string('pattern')->nullable();
+            $blueprint->timestamp('created_at')->nullable();
+            $blueprint->timestamp('updated_at')->nullable();
+        });
+
+        for ($i = 1; $i <= 18; $i++) {
+            DB::table('migrations')->insert(['id' => $i]);
+        }
+        for ($i = 1; $i <= $classificationRows; $i++) {
+            DB::table('classification_rules')->insert([
+                'id' => $i,
+                'key' => 'rule-' . $i,
+                'pattern' => 'class-' . $i . $classificationSuffix,
+                'created_at' => '2026-05-10',
+                'updated_at' => '2026-05-10',
+            ]);
+        }
+
+        if ($targetSiteTokens) {
+            Schema::create('site_tokens', function ($blueprint): void {
+                $blueprint->integer('id')->primary();
+                $blueprint->string('token_hash')->nullable();
+            });
+            DB::table('site_tokens')->insert(['id' => 1, 'token_hash' => 'redacted']);
+        }
+    }
+
+    /** @return array<string, int> */
+    private function targetSnapshotCounts(): array
+    {
+        $tables = [
+            'users',
+            'devices',
+            'device_scans',
+            'raw_files',
+            'runner_commands',
+            'classification_rules',
+            'migrations',
+        ];
+
+        $counts = [];
+        foreach ($tables as $table) {
+            $counts[$table] = DB::table($table)->count();
+        }
+
+        return $counts;
     }
 
     private function runCommand(array $parameters): array

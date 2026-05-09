@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PDO;
@@ -15,12 +16,18 @@ class MariaDbRehearsalTransfer extends Command
     private const LIVE_LARAVEL_PATH = 'D:\\inventory\\laravel';
     private const LIVE_SQLITE_PATH = 'D:\\inventory\\laravel\\database\\database.sqlite';
     private const EXPECTED_SOURCE_PATH = 'D:\\inventory-rehearsal\\source-copy\\database.sqlite';
+    private const RAW_ARCHIVE_PATH = 'D:\\inventory-rehearsal\\raw_archive';
+    private const DOWNLOADS_PATH = 'D:\\inventory-rehearsal\\downloads';
+    private const MARIADB_DUMP_DIR = 'D:\\inventory-rehearsal\\backups\\mariadb_dumps';
     private const TARGET_DATABASE = 'inventory_rehearsal';
     private const RESTORE_DATABASE = 'inventory_rehearsal_restore';
+    private const MIN_EXPECTED_MIGRATION_ROWS = 18;
 
     protected $signature = 'inventory:mariadb-rehearsal-transfer
         {--source= : Explicit copied SQLite source path}
-        {--dry-run : Required; this command has no execute mode}';
+        {--dry-run : Required; this command has no execute mode}
+        {--readiness : Read-only execute-readiness diagnostics; requires --dry-run}
+        {--dump-marker= : Existing MariaDB dump marker/path for read-only readiness validation}';
 
     protected $description = 'Dry-run-only app-aware SQLite-to-MariaDB rehearsal transfer planner';
 
@@ -61,12 +68,43 @@ class MariaDbRehearsalTransfer extends Command
     /** @var list<string> */
     private array $optionalTables = [
         'site_tokens',
-        'classification_rules',
         'department_cleanup_rules',
         'site_cleanup_rules',
         'personal_access_tokens',
         'password_reset_tokens',
+        'jobs',
         'failed_jobs',
+        'cache',
+        'sessions',
+    ];
+
+    /** @var list<string> */
+    private array $executeImportTables = [
+        'users',
+        'collector_sites',
+        'devices',
+        'device_identities',
+        'device_scans',
+        'hardware_snapshots',
+        'storage_health_observations',
+        'network_observations',
+        'peripherals',
+        'device_assignments',
+        'raw_files',
+        'change_log',
+        'collectors',
+        'runners',
+        'runner_commands',
+    ];
+
+    /** @var list<string> */
+    private array $frameworkTransientTables = [
+        'personal_access_tokens',
+        'password_reset_tokens',
+        'jobs',
+        'failed_jobs',
+        'cache',
+        'sessions',
     ];
 
     /** @var list<string> */
@@ -91,6 +129,8 @@ class MariaDbRehearsalTransfer extends Command
 
     public function handle(): int
     {
+        $this->resetRuntimeState();
+
         $this->line('MariaDB rehearsal transfer dry-run');
         $this->infoLine('Dry-run only. No execute mode exists. No data is written.');
         $this->infoLine('Database is authoritative. Raw CSV files are archived evidence only.');
@@ -116,6 +156,9 @@ class MariaDbRehearsalTransfer extends Command
             $this->tokenMetadataSummarySection();
             $this->rawEvidenceReferenceSummarySection();
             $this->assignmentOverrideSummarySection();
+            if ((bool) $this->option('readiness')) {
+                $this->executeReadinessDiagnosticsSection((string) $this->option('dump-marker'));
+            }
             $this->futureResetPlanSection();
             $this->futureExecutePrerequisitesSection();
             $this->stopConditionsSection();
@@ -126,6 +169,16 @@ class MariaDbRehearsalTransfer extends Command
         return $this->hasFail ? self::FAILURE : self::SUCCESS;
     }
 
+    private function resetRuntimeState(): void
+    {
+        $this->hasFail = false;
+        $this->hasWarn = false;
+        $this->sourceTables = [];
+        $this->sourceColumns = [];
+        $this->targetTables = [];
+        $this->source = null;
+    }
+
     private function environmentBoundarySection(string $sourcePath): void
     {
         $this->section('Environment boundary');
@@ -134,6 +187,14 @@ class MariaDbRehearsalTransfer extends Command
             $this->fail('--dry-run is required. This command is dry-run-only.');
         } else {
             $this->ok('--dry-run supplied');
+        }
+
+        if ((bool) $this->option('readiness') && ! (bool) $this->option('dry-run')) {
+            $this->fail('--readiness requires --dry-run.');
+        }
+
+        if ((bool) $this->option('readiness')) {
+            $this->ok('--readiness supplied');
         }
 
         if (trim($sourcePath) === '') {
@@ -149,20 +210,20 @@ class MariaDbRehearsalTransfer extends Command
         }
 
         $basePath = $this->normalizePath(base_path());
-        if ($basePath !== self::EXPECTED_BASE_PATH) {
+        if ($basePath !== $this->expectedBasePath()) {
             $this->fail('Current Laravel base path is not the rehearsal path.');
         } else {
             $this->ok('Laravel base path is the rehearsal path.');
         }
 
         $normalizedSource = $this->normalizePath($sourcePath);
-        if ($normalizedSource === self::LIVE_SQLITE_PATH) {
+        if ($normalizedSource === $this->liveSqlitePath()) {
             $this->fail('Source path is the live SQLite database and is refused.');
         }
-        if ($normalizedSource !== '' && $this->pathIsInside($normalizedSource, self::LIVE_LARAVEL_PATH)) {
+        if ($normalizedSource !== '' && $this->pathIsInside($normalizedSource, $this->liveLaravelPath())) {
             $this->fail('Source path is under the live Laravel path and is refused.');
         }
-        if ($normalizedSource !== '' && $normalizedSource !== self::EXPECTED_SOURCE_PATH) {
+        if ($normalizedSource !== '' && $normalizedSource !== $this->expectedSourcePath()) {
             $this->fail('Source path must be the copied rehearsal SQLite source.');
         }
 
@@ -174,13 +235,16 @@ class MariaDbRehearsalTransfer extends Command
             ? $this->ok('DB_CONNECTION is mysql')
             : $this->fail('DB_CONNECTION is not mysql');
 
-        $databaseName === self::TARGET_DATABASE
+        $databaseName === $this->targetDatabase()
             ? $this->ok('DB_DATABASE is inventory_rehearsal')
             : $this->fail('DB_DATABASE is not inventory_rehearsal');
 
         str_contains($appUrl, 'inventory-pilot.internal.lan')
             ? $this->fail('APP_URL contains inventory-pilot.internal.lan')
             : $this->ok('APP_URL does not contain live pilot hostname');
+
+        $this->infoLine('execute_option_available=no');
+        $this->infoLine('writes_performed=no');
     }
 
     private function sourceSqliteValidationSection(string $sourcePath): void
@@ -258,6 +322,9 @@ class MariaDbRehearsalTransfer extends Command
         try {
             $ran = DB::table('migrations')->count();
             $this->infoLine('Target migrations row count: ' . $ran);
+            if ((bool) $this->option('readiness') && $ran < self::MIN_EXPECTED_MIGRATION_ROWS) {
+                $this->fail('Target migration state is incomplete for execute-readiness.');
+            }
         } catch (Throwable) {
             $this->fail('Migrations table could not be inspected.');
         }
@@ -273,7 +340,13 @@ class MariaDbRehearsalTransfer extends Command
             $restoreExists = true;
             $tableCount = 0;
 
-            if ($driver === 'mysql') {
+            $configuredRestoreExists = config('inventory.mariadb_rehearsal.restore_database_exists');
+            $configuredRestoreTableCount = config('inventory.mariadb_rehearsal.restore_database_table_count');
+
+            if ($configuredRestoreExists !== null || $configuredRestoreTableCount !== null) {
+                $restoreExists = (bool) $configuredRestoreExists;
+                $tableCount = (int) $configuredRestoreTableCount;
+            } elseif ($driver === 'mysql') {
                 $restoreExists = (int) $connection->table('information_schema.SCHEMATA')
                     ->where('SCHEMA_NAME', self::RESTORE_DATABASE)
                     ->count() === 1;
@@ -293,6 +366,301 @@ class MariaDbRehearsalTransfer extends Command
         } catch (Throwable) {
             $this->fail('inventory_rehearsal_restore isolation check failed.');
         }
+    }
+
+    private function executeReadinessDiagnosticsSection(string $dumpMarker): void
+    {
+        $this->section('Execute-readiness diagnostics');
+        $this->infoLine('mode=dry_run_execute_readiness');
+        $this->infoLine('writes_performed=no');
+        $this->infoLine('execute_option_available=no');
+        $this->infoLine('target_reset_performed=no');
+        $this->infoLine('dump_created=no');
+        $this->infoLine('restore_performed=no');
+        $this->infoLine('execute_approved=no');
+
+        $this->copiedEvidencePathsReadinessSection();
+        $this->emptyTargetValidationSection();
+        $this->dumpMarkerValidationSection($dumpMarker);
+        $this->classificationRulesCompareOnlySection();
+        $this->rawEvidencePathMappingDiagnosticsSection();
+        $this->optionalTablePolicySection();
+        $this->schemaDifferencePolicySection();
+    }
+
+    private function copiedEvidencePathsReadinessSection(): void
+    {
+        $this->section('Readiness copied evidence paths');
+        is_dir($this->rawArchivePath())
+            ? $this->ok('Copied raw archive exists.')
+            : $this->fail('Copied raw archive is missing.');
+
+        is_dir($this->downloadsPath())
+            ? $this->ok('Copied downloads path exists.')
+            : $this->warnLine('Copied downloads path missing or not needed by current source.');
+
+        $this->infoLine('web_endpoint_exposed=no');
+        $this->infoLine('package_generation_performed=no');
+        $this->infoLine('runner_collector_traffic_changed=no');
+    }
+
+    private function emptyTargetValidationSection(): void
+    {
+        $this->section('Empty target validation');
+
+        $domainUnexpected = 0;
+        foreach ($this->executeImportTables as $table) {
+            $count = Schema::hasTable($table) ? $this->targetCount($table) : 0;
+            if ($count > 0) {
+                $domainUnexpected += $count;
+                $this->fail("Target application/domain table is not empty: {$table}");
+            }
+        }
+
+        $frameworkUnexpected = 0;
+        foreach ($this->frameworkTransientTables as $table) {
+            $count = Schema::hasTable($table) ? $this->targetCount($table) : 0;
+            if ($count > 0) {
+                $frameworkUnexpected += $count;
+                $this->fail("Target framework/transient table has unexpected rows: {$table}");
+            }
+        }
+
+        $migrationsRows = Schema::hasTable('migrations') ? $this->targetCount('migrations') : 0;
+        if ($migrationsRows <= 0) {
+            $this->fail('Target migrations table is missing applied migration rows.');
+        }
+
+        $classificationRows = Schema::hasTable('classification_rules') ? $this->targetCount('classification_rules') : 0;
+
+        $status = $domainUnexpected === 0 && $frameworkUnexpected === 0 && $migrationsRows > 0 ? 'PASS' : 'FAIL';
+        $this->infoLine("target_empty_state={$status}");
+        $this->infoLine("target_domain_rows_unexpected_count={$domainUnexpected}");
+        $this->infoLine("target_framework_rows_unexpected_count={$frameworkUnexpected}");
+        $this->infoLine("target_migrations_rows={$migrationsRows}");
+        $this->infoLine("target_classification_rules_rows={$classificationRows}");
+        $this->infoLine('target_reset_attempted=no');
+    }
+
+    private function dumpMarkerValidationSection(string $dumpMarker): void
+    {
+        $this->section('Dump marker validation');
+
+        $dumpMarker = trim($dumpMarker);
+        $this->infoLine('dump_marker_supplied=' . ($dumpMarker === '' ? 'no' : 'yes'));
+        if ($dumpMarker === '') {
+            $this->fail('--dump-marker is required with --readiness.');
+            $this->infoLine('dump_created_by_command=no');
+            $this->infoLine('dump_contents_printed=no');
+            return;
+        }
+
+        $normalized = $this->normalizePath($dumpMarker);
+        $approvedDir = $this->dumpDirectoryPath();
+        $underApproved = $this->pathIsInside($normalized, $approvedDir) && ! str_contains($normalized, '..');
+        $this->infoLine('dump_marker_under_approved_directory=' . ($underApproved ? 'yes' : 'no'));
+        if (! $underApproved) {
+            $this->fail('Dump marker is outside approved MariaDB dump directory.');
+        }
+
+        $exists = is_file($dumpMarker);
+        $this->infoLine('dump_marker_exists=' . ($exists ? 'yes' : 'no'));
+        if (! $exists) {
+            $this->fail('Dump marker file does not exist.');
+            $this->infoLine('dump_created_by_command=no');
+            $this->infoLine('dump_contents_printed=no');
+            return;
+        }
+
+        $size = filesize($dumpMarker);
+        $nonZero = $size !== false && $size > 0;
+        $this->infoLine('dump_marker_nonzero=' . ($nonZero ? 'yes' : 'no'));
+        if (! $nonZero) {
+            $this->fail('Dump marker file is zero bytes.');
+        }
+
+        $modifiedAt = filemtime($dumpMarker);
+        $plausible = $modifiedAt !== false && $modifiedAt <= time() + 300;
+        $this->infoLine('dump_marker_timestamp_plausible=' . ($plausible ? 'yes' : 'no'));
+        if (! $plausible) {
+            $this->warnLine('Dump marker timestamp is not plausible for current rehearsal.');
+        }
+
+        $this->infoLine('dump_marker_basename=' . basename($dumpMarker));
+        $this->infoLine('dump_marker_size=' . ($size === false ? 'unknown' : (string) $size));
+        $this->infoLine('dump_created_by_command=no');
+        $this->infoLine('dump_contents_printed=no');
+    }
+
+    private function classificationRulesCompareOnlySection(): void
+    {
+        $this->section('classification_rules compare-only validation');
+
+        $sourceCount = $this->sourceHasTable('classification_rules') ? $this->sourceCount('classification_rules') : 0;
+        $targetCount = Schema::hasTable('classification_rules') ? $this->targetCount('classification_rules') : 0;
+        $this->infoLine("classification_rules_source_count={$sourceCount}");
+        $this->infoLine("classification_rules_target_count={$targetCount}");
+
+        $sourceIds = $this->classificationRuleIdentifiers('source');
+        $targetIds = $this->classificationRuleIdentifiers('target');
+        $sourceChecksum = $this->classificationRuleChecksum('source');
+        $targetChecksum = $this->classificationRuleChecksum('target');
+
+        $identifierMatch = $sourceIds !== [] && $sourceIds === $targetIds;
+        $checksumMatch = $sourceChecksum !== '' && hash_equals($sourceChecksum, $targetChecksum);
+        $this->infoLine('classification_rules_safe_identifier_match=' . ($identifierMatch ? 'yes' : 'no'));
+        $this->infoLine('classification_rules_safe_checksum_match=' . ($checksumMatch ? 'yes' : 'no'));
+        $this->infoLine('classification_rules_action=preserve_target_skip_import');
+        $this->infoLine('classification_rules_write_attempted=no');
+
+        if ($sourceCount === 0 && $targetCount === 0) {
+            $this->warnLine('classification_rules absent in both source and target.');
+            return;
+        }
+
+        if ($sourceCount === 0 && $targetCount > 0) {
+            $this->fail('classification_rules target has rows while source has none.');
+            return;
+        }
+
+        if ($sourceCount > 0 && $targetCount === 0) {
+            $this->fail('classification_rules source has rows while target has none.');
+            return;
+        }
+
+        if ($sourceCount !== $targetCount || ! $identifierMatch || ! $checksumMatch) {
+            $this->fail('classification_rules source/target comparison mismatch.');
+            return;
+        }
+
+        $this->ok('classification_rules compare-only validation passed.');
+    }
+
+    private function rawEvidencePathMappingDiagnosticsSection(): void
+    {
+        $this->section('Raw evidence path mapping diagnostics');
+
+        $rawFilesCount = $this->sourceCount('raw_files');
+        $pathColumn = $this->firstExistingColumn('raw_files', ['saved_path', 'archive_path', 'path']);
+        $savedPathPopulated = $pathColumn ? $this->sourceNotNullCount('raw_files', $pathColumn) : 0;
+        $archiveIndex = $this->archiveBasenameIndex();
+        $archiveFileCount = array_sum(array_map('count', $archiveIndex));
+        $archiveUniqueBasenameCount = count(array_filter($archiveIndex, fn (array $paths): bool => count($paths) === 1));
+        $archiveDuplicateBasenameCount = count(array_filter($archiveIndex, fn (array $paths): bool => count($paths) > 1));
+
+        $basenameExists = 0;
+        $basenameUnique = 0;
+        $suffixResolved = 0;
+        $ambiguous = 0;
+        $unresolved = 0;
+        $hashChecked = 0;
+        $hashMismatch = 0;
+
+        if ($pathColumn !== null) {
+            foreach ($this->sourceRows('SELECT ' . $this->quoteIdentifier($pathColumn) . ' AS path, raw_hash FROM raw_files WHERE ' . $this->quoteIdentifier($pathColumn) . ' IS NOT NULL AND TRIM(CAST(' . $this->quoteIdentifier($pathColumn) . ' AS TEXT)) != \'\'') as $row) {
+                $path = (string) $row['path'];
+                $basename = basename(str_replace('\\', '/', $path));
+                $candidates = $archiveIndex[$basename] ?? [];
+                if ($candidates !== []) {
+                    $basenameExists++;
+                }
+                if (count($candidates) === 1) {
+                    $basenameUnique++;
+                    $suffixResolved++;
+                    $rawHash = strtolower(trim((string) ($row['raw_hash'] ?? '')));
+                    if (preg_match('/^[a-f0-9]{64}$/', $rawHash) === 1) {
+                        $hashChecked++;
+                        $candidateHash = hash_file('sha256', $candidates[0]);
+                        if ($candidateHash !== $rawHash) {
+                            $hashMismatch++;
+                        }
+                    }
+                    continue;
+                }
+                if (count($candidates) > 1) {
+                    $suffixCandidates = $this->suffixMatchingCandidates($path, $candidates);
+                    if (count($suffixCandidates) === 1) {
+                        $suffixResolved++;
+                    } elseif (count($suffixCandidates) > 1) {
+                        $ambiguous++;
+                    } else {
+                        $unresolved++;
+                    }
+                    continue;
+                }
+                $unresolved++;
+            }
+        }
+
+        $this->infoLine("raw_files_count={$rawFilesCount}");
+        $this->infoLine("saved_path_populated_count={$savedPathPopulated}");
+        $this->infoLine("archive_file_count={$archiveFileCount}");
+        $this->infoLine("archive_unique_basename_count={$archiveUniqueBasenameCount}");
+        $this->infoLine("archive_duplicate_basename_count={$archiveDuplicateBasenameCount}");
+        $this->infoLine("basename_exists_in_archive={$basenameExists}");
+        $this->infoLine("basename_unique_in_archive={$basenameUnique}");
+        $this->infoLine("suffix_resolved_count={$suffixResolved}");
+        $this->infoLine("ambiguous_count={$ambiguous}");
+        $this->infoLine("unresolved_count={$unresolved}");
+        $this->infoLine("hash_checked_count={$hashChecked}");
+        $this->infoLine("hash_mismatch_count={$hashMismatch}");
+        $this->infoLine('raw_filenames_printed=no');
+        $this->infoLine('raw_file_lists_printed=no');
+        $this->infoLine('raw_contents_printed=no');
+        $this->infoLine('resolved_paths_stored=no');
+
+        if ($ambiguous > 0 || $unresolved > 0 || $hashMismatch > 0) {
+            $this->fail('Raw evidence path mapping readiness failed.');
+        }
+    }
+
+    private function optionalTablePolicySection(): void
+    {
+        $this->section('Optional missing table policy');
+        foreach (['site_tokens', 'department_cleanup_rules', 'site_cleanup_rules'] as $table) {
+            $sourcePresent = $this->sourceHasTable($table);
+            $targetPresent = Schema::hasTable($table);
+            $targetRows = $targetPresent ? $this->targetCount($table) : 0;
+
+            if (! $sourcePresent && ! $targetPresent) {
+                $this->warnLine("optional_table={$table} action=skip_absent_in_both");
+                continue;
+            }
+            if ($sourcePresent && ! $targetPresent) {
+                $this->fail("Optional table present in source but missing in target: {$table}");
+                continue;
+            }
+            if (! $sourcePresent && $targetRows > 0) {
+                $this->fail("Optional table absent in source but target has rows: {$table}");
+                continue;
+            }
+            $this->infoLine("optional_table={$table} source_present=" . ($sourcePresent ? 'yes' : 'no') . ' target_present=' . ($targetPresent ? 'yes' : 'no') . " target_rows={$targetRows}");
+        }
+    }
+
+    private function schemaDifferencePolicySection(): void
+    {
+        $this->section('Schema difference policy');
+        foreach ([
+            ['raw_files', 'device_scan_id'],
+            ['raw_files', 'device_id'],
+            ['storage_health_observations', 'raw_json'],
+        ] as [$table, $column]) {
+            $present = $this->sourceHasColumn($table, $column);
+            $this->warnLine("known_optional_column={$table}.{$column} present=" . ($present ? 'yes' : 'no') . ' action=' . ($present ? 'validate_available' : 'skip_known_optional_missing'));
+        }
+
+        $unexpectedRequiredMissing = 0;
+        foreach ($this->executeImportTables as $table) {
+            if (! Schema::hasTable($table) || ! $this->sourceHasTable($table)) {
+                continue;
+            }
+            foreach ($this->targetRequiredColumnsWithoutSafeSource($table) as $column) {
+                $unexpectedRequiredMissing++;
+                $this->fail("Required target column has no safe source/default: {$table}.{$column}");
+            }
+        }
+        $this->infoLine("unexpected_required_schema_difference_count={$unexpectedRequiredMissing}");
     }
 
     private function plannedTransferOrderSection(): void
@@ -802,6 +1170,151 @@ class MariaDbRehearsalTransfer extends Command
         return array_sum(array_map(fn (string $table): int => $this->sourceCount($table), ['site_tokens', 'personal_access_tokens']));
     }
 
+    /** @return list<string> */
+    private function classificationRuleIdentifiers(string $side): array
+    {
+        $rows = $this->classificationRuleRows($side);
+        $identifiers = [];
+        foreach ($rows as $row) {
+            $identifier = $this->firstNonEmptyValue($row, ['key', 'name', 'pattern', 'label', 'id']);
+            if ($identifier === '') {
+                return [];
+            }
+            $identifiers[] = hash('sha256', $identifier);
+        }
+
+        sort($identifiers);
+
+        return count($identifiers) === count(array_unique($identifiers)) ? $identifiers : [];
+    }
+
+    private function classificationRuleChecksum(string $side): string
+    {
+        $rows = $this->classificationRuleRows($side);
+        if ($rows === []) {
+            return '';
+        }
+
+        $safeRows = [];
+        foreach ($rows as $row) {
+            ksort($row);
+            unset($row['created_at'], $row['updated_at']);
+            $safeRows[] = json_encode($row, JSON_THROW_ON_ERROR);
+        }
+        sort($safeRows);
+
+        return hash('sha256', implode("\n", $safeRows));
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function classificationRuleRows(string $side): array
+    {
+        if ($side === 'source') {
+            if (! $this->sourceHasTable('classification_rules')) {
+                return [];
+            }
+
+            return $this->sourceRows('SELECT * FROM classification_rules');
+        }
+
+        if (! Schema::hasTable('classification_rules')) {
+            return [];
+        }
+
+        try {
+            return array_map(fn (object $row): array => (array) $row, DB::table('classification_rules')->get()->all());
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /** @param array<string, mixed> $row */
+    private function firstNonEmptyValue(array $row, array $columns): string
+    {
+        foreach ($columns as $column) {
+            $value = trim((string) ($row[$column] ?? ''));
+            if ($value !== '') {
+                return $column . ':' . $value;
+            }
+        }
+
+        return '';
+    }
+
+    /** @return array<string, list<string>> */
+    private function archiveBasenameIndex(): array
+    {
+        $root = $this->rawArchivePath();
+        if (! is_dir($root)) {
+            return [];
+        }
+
+        $index = [];
+        foreach (File::allFiles($root) as $file) {
+            $index[$file->getBasename()][] = $file->getPathname();
+        }
+
+        return $index;
+    }
+
+    /** @param list<string> $candidates @return list<string> */
+    private function suffixMatchingCandidates(string $storedPath, array $candidates): array
+    {
+        $normalizedStored = strtolower(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $storedPath));
+        $segments = array_values(array_filter(explode(DIRECTORY_SEPARATOR, $normalizedStored), fn (string $segment): bool => $segment !== ''));
+
+        $matches = [];
+        foreach ($candidates as $candidate) {
+            $normalizedCandidate = strtolower(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $candidate));
+            for ($length = min(count($segments), 4); $length >= 1; $length--) {
+                $suffix = implode(DIRECTORY_SEPARATOR, array_slice($segments, -$length));
+                if ($suffix !== '' && str_ends_with($normalizedCandidate, $suffix)) {
+                    $matches[] = $candidate;
+                    break;
+                }
+            }
+        }
+
+        return array_values(array_unique($matches));
+    }
+
+    /** @return list<string> */
+    private function targetRequiredColumnsWithoutSafeSource(string $table): array
+    {
+        try {
+            $databaseName = $this->targetDatabase();
+            $driver = DB::connection()->getDriverName();
+            if ($driver !== 'mysql') {
+                return [];
+            }
+
+            $rows = DB::table('information_schema.COLUMNS')
+                ->select(['COLUMN_NAME', 'IS_NULLABLE', 'COLUMN_DEFAULT', 'EXTRA'])
+                ->where('TABLE_SCHEMA', $databaseName)
+                ->where('TABLE_NAME', $table)
+                ->get();
+        } catch (Throwable) {
+            return [];
+        }
+
+        $missing = [];
+        foreach ($rows as $row) {
+            $column = (string) $row->COLUMN_NAME;
+            $nullable = (string) $row->IS_NULLABLE;
+            $default = $row->COLUMN_DEFAULT;
+            $extra = strtolower((string) $row->EXTRA);
+            if ($this->sourceHasColumn($table, $column)) {
+                continue;
+            }
+            if ($nullable === 'YES' || $default !== null || str_contains($extra, 'auto_increment')) {
+                continue;
+            }
+            $missing[] = $column;
+        }
+
+        return $missing;
+    }
+
     private function referencedEvidenceMissingCount(string $pathColumn): int
     {
         if (! $this->sourceHasColumn('raw_files', $pathColumn)) {
@@ -817,7 +1330,7 @@ class MariaDbRehearsalTransfer extends Command
             $candidate = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
             $full = str_starts_with($candidate, 'D:' . DIRECTORY_SEPARATOR)
                 ? $candidate
-                : 'D:' . DIRECTORY_SEPARATOR . 'inventory-rehearsal' . DIRECTORY_SEPARATOR . 'raw_archive' . DIRECTORY_SEPARATOR . ltrim($candidate, DIRECTORY_SEPARATOR);
+                : $this->rawArchivePath() . DIRECTORY_SEPARATOR . ltrim($candidate, DIRECTORY_SEPARATOR);
             if (! is_file($full)) {
                 $missing++;
             }
@@ -851,6 +1364,46 @@ class MariaDbRehearsalTransfer extends Command
         $parent = strtolower($this->normalizePath($parent));
 
         return $path === $parent || str_starts_with($path, $parent . '\\');
+    }
+
+    private function expectedBasePath(): string
+    {
+        return $this->normalizePath((string) config('inventory.mariadb_rehearsal.expected_base_path', self::EXPECTED_BASE_PATH));
+    }
+
+    private function liveLaravelPath(): string
+    {
+        return $this->normalizePath((string) config('inventory.mariadb_rehearsal.live_laravel_path', self::LIVE_LARAVEL_PATH));
+    }
+
+    private function liveSqlitePath(): string
+    {
+        return $this->normalizePath((string) config('inventory.mariadb_rehearsal.live_sqlite_path', self::LIVE_SQLITE_PATH));
+    }
+
+    private function expectedSourcePath(): string
+    {
+        return $this->normalizePath((string) config('inventory.mariadb_rehearsal.expected_source_path', self::EXPECTED_SOURCE_PATH));
+    }
+
+    private function rawArchivePath(): string
+    {
+        return $this->normalizePath((string) config('inventory.mariadb_rehearsal.raw_archive_path', self::RAW_ARCHIVE_PATH));
+    }
+
+    private function downloadsPath(): string
+    {
+        return $this->normalizePath((string) config('inventory.mariadb_rehearsal.downloads_path', self::DOWNLOADS_PATH));
+    }
+
+    private function dumpDirectoryPath(): string
+    {
+        return $this->normalizePath((string) config('inventory.mariadb_rehearsal.dump_directory', self::MARIADB_DUMP_DIR));
+    }
+
+    private function targetDatabase(): string
+    {
+        return (string) config('inventory.mariadb_rehearsal.target_database', self::TARGET_DATABASE);
     }
 
     private function section(string $name): void

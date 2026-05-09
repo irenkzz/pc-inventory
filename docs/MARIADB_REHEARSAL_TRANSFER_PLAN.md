@@ -695,3 +695,17 @@ Key design decisions:
 - Optional missing tables remain WARN/skip only when absent in both source and target.
 
 Next safe phase: Phase 19L read-only execute-readiness hardening, diagnostics, and tests only; no writes.
+
+## 31. Phase 19L execute-readiness diagnostics
+
+Phase 19L extends the existing dry-run-only command with read-only execute-readiness diagnostics:
+
+```powershell
+php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory-rehearsal\source-copy\database.sqlite" --dry-run --readiness --dump-marker="D:\inventory-rehearsal\backups\mariadb_dumps\<dump-file-or-marker>"
+```
+
+The readiness mode validates Phase 19K gates without writing data: explicit source, dry-run mode, dump marker, empty target state, compare-only `classification_rules`, raw evidence path mapping, optional table policy, and known schema differences.
+
+It still has no `--execute` mode and does not transfer data, reset/truncate tables, create dumps, restore dumps, write to `inventory_rehearsal_restore`, expose a web endpoint, generate packages/site kits, change live config, read/mutate live SQLite, or change runner/collector traffic.
+
+Phase 19M remains the earliest possible future execute-import phase and requires separate approval.
