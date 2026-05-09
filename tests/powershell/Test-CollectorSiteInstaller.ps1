@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $InstallerPath = Join-Path $RepoRoot 'collector\install_collector_site.ps1'
+$CollectorInstallerPath = Join-Path $RepoRoot 'collector\install_collector.ps1'
 $DirectInstallerPath = Join-Path $RepoRoot 'runner\scripts\install_direct_https_runner.ps1'
 
 $script:Failures = New-Object System.Collections.Generic.List[string]
@@ -54,8 +55,12 @@ function Assert-Matches {
 if (-not (Test-Path $InstallerPath)) {
     throw "Installer not found: $InstallerPath"
 }
+if (-not (Test-Path $CollectorInstallerPath)) {
+    throw "Collector installer not found: $CollectorInstallerPath"
+}
 
 $scriptText = Get-Content -Path $InstallerPath -Raw -Encoding UTF8
+$collectorInstallerText = Get-Content -Path $CollectorInstallerPath -Raw -Encoding UTF8
 
 Assert-Contains $scriptText 'Collector config accepted for siteId' 'accepts valid collector-share config'
 Assert-Contains $scriptText 'Direct HTTPS runner config refused' 'refuses Direct HTTPS runner config'
@@ -83,6 +88,7 @@ Assert-NotContains $scriptText '/commands' 'does not call Laravel command APIs'
 Assert-NotContains $scriptText 'repair_update' 'does not trigger repair/update'
 Assert-Matches $scriptText 'Test-CollectorConfig -Config \$config.*?Invoke-HealthCheck.*?Test-ShareReadWrite.*?Invoke-CollectorInstaller' 'delegates to install_collector only after validations pass'
 Assert-Contains $scriptText 'install_collector.ps1' 'delegates to existing install_collector.ps1'
+Assert-Contains $scriptText 'Python runtime was not found. Collector-share mode requires Python 3.x on the collector host for this MVP. Install Python 3.x with pythonw/python in PATH, or use Direct HTTPS mode for small/no-IT sites.' 'surfaces missing Python dependency clearly'
 Assert-Contains $scriptText 'Test-ScheduledTaskExists' 'verifies scheduled task after install'
 Assert-Contains $scriptText 'Runner staging area was not found' 'warns clearly when runner staging is missing'
 Assert-Contains $scriptText 'Installed collector config exists' 'verifies installed collector config after install'
@@ -91,6 +97,18 @@ Assert-NotContains $scriptText 'Write-InstallerLine ''INFO'' "token' 'does not p
 Assert-NotContains $scriptText 'ConvertTo-Json' 'does not dump raw config'
 Assert-NotContains $scriptText 'APP_KEY' 'does not print APP_KEY values'
 Assert-NotContains $scriptText '.env' 'does not print .env values'
+
+Assert-NotContains $collectorInstallerText '(Get-Command pythonw -ErrorAction SilentlyContinue).Source' 'install_collector.ps1 no longer uses brittle direct Source access'
+Assert-Contains $collectorInstallerText 'function Resolve-PythonExecutable' 'install_collector.ps1 defines Python resolver helper'
+Assert-Contains $collectorInstallerText "foreach (`$commandName in @('pythonw', 'python'))" 'Python resolver tries pythonw then python'
+Assert-Contains $collectorInstallerText 'Get-Command py -ErrorAction SilentlyContinue' 'Python resolver tries py launcher safely'
+Assert-Contains $collectorInstallerText "foreach (`$propertyName in @('Source', 'Path'))" 'Python resolver handles Source and Path command properties'
+Assert-Contains $collectorInstallerText 'if (-not $Command)' 'Python resolver handles null command results safely'
+Assert-Contains $collectorInstallerText "Arguments = @('-3')" 'Python resolver uses py launcher with Python 3 selector'
+Assert-Contains $collectorInstallerText 'Python runtime was not found. Collector-share mode requires Python 3.x on the collector host for this MVP. Install Python 3.x with pythonw/python in PATH, or use Direct HTTPS mode for small/no-IT sites.' 'missing Python failure explains collector-share dependency and Direct HTTPS option'
+Assert-NotContains $collectorInstallerText 'SkipCertificateCheck' 'install_collector.ps1 does not introduce SkipCertificateCheck'
+Assert-NotContains $collectorInstallerText 'ConvertTo-Json' 'install_collector.ps1 does not dump raw config'
+Assert-NotContains $collectorInstallerText 'site_token' 'install_collector.ps1 does not print token fields'
 
 if (Test-Path $DirectInstallerPath) {
     $directInstallerText = Get-Content -Path $DirectInstallerPath -Raw -Encoding UTF8

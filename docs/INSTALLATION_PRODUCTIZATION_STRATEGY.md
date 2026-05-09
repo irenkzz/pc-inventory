@@ -199,6 +199,8 @@ Collector-share behavior must be preserved. The collector-site installer must no
 
 Generated collector-share site kits include the wrapper additively through the existing collector package folder. Direct HTTPS packages remain without collector files. Config schema and token handling are unchanged. Source validation passed with the PowerShell parser check, `tests/powershell/Test-CollectorSiteInstaller.ps1`, `tests/powershell/Test-DirectHttpsInstaller.ps1`, and targeted Laravel package tests. Supermicro/live collector validation is still required after reviewed pull.
 
+Phase 18E.1 documents a productization dependency found during live collector validation: collector-share MVP requires Python 3.x on the managed collector host. `collector/install_collector.ps1` now resolves `pythonw`, `python`, or the `py` launcher safely and fails with a clear message when no Python runtime is available. Python is not auto-installed or bundled in this MVP. Small/no-IT remote sites should use Direct HTTPS mode instead; future productization may bundle Python or package the collector as a self-contained executable/service.
+
 ## 10. Built-in Preflight/Readiness Checks
 
 Future installer and wizard checks may reuse or align with existing operational commands:

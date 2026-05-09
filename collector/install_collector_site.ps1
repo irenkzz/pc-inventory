@@ -299,11 +299,16 @@ function Invoke-CollectorInstaller {
     }
 
     $output = & powershell @args 2>&1
+    $outputText = ($output | ForEach-Object { [string]$_ }) -join "`n"
     foreach ($line in $output) {
         Write-InstallerLine 'INFO' ([string]$line)
     }
 
     if ($LASTEXITCODE -ne 0) {
+        if ($outputText -like '*Python runtime was not found*') {
+            throw 'Python runtime was not found. Collector-share mode requires Python 3.x on the collector host for this MVP. Install Python 3.x with pythonw/python in PATH, or use Direct HTTPS mode for small/no-IT sites.'
+        }
+
         throw "install_collector.ps1 failed with exit code $LASTEXITCODE."
     }
 }

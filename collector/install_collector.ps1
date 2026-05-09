@@ -10,6 +10,55 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-CommandExecutableValue {
+    param([object]$Command)
+
+    if (-not $Command) {
+        return ''
+    }
+
+    $candidate = @($Command | Select-Object -First 1)[0]
+    foreach ($propertyName in @('Source', 'Path')) {
+        if ($candidate.PSObject.Properties.Name -contains $propertyName) {
+            $value = [string]$candidate.$propertyName
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                return $value
+            }
+        }
+    }
+
+    $name = [string]$candidate.Name
+    if (-not [string]::IsNullOrWhiteSpace($name)) {
+        return $name
+    }
+
+    return ''
+}
+
+function Resolve-PythonExecutable {
+    foreach ($commandName in @('pythonw', 'python')) {
+        $command = Get-Command $commandName -ErrorAction SilentlyContinue
+        $executable = Get-CommandExecutableValue -Command $command
+        if (-not [string]::IsNullOrWhiteSpace($executable)) {
+            return [pscustomobject]@{
+                Executable = $executable
+                Arguments = @()
+            }
+        }
+    }
+
+    $pyCommand = Get-Command py -ErrorAction SilentlyContinue
+    $pyExecutable = Get-CommandExecutableValue -Command $pyCommand
+    if (-not [string]::IsNullOrWhiteSpace($pyExecutable)) {
+        return [pscustomobject]@{
+            Executable = $pyExecutable
+            Arguments = @('-3')
+        }
+    }
+
+    throw 'Python runtime was not found. Collector-share mode requires Python 3.x on the collector host for this MVP. Install Python 3.x with pythonw/python in PATH, or use Direct HTTPS mode for small/no-IT sites.'
+}
+
 if (-not (Test-Path $CollectorRoot)) {
     throw "CollectorRoot not found: $CollectorRoot"
 }
@@ -17,10 +66,7 @@ if (-not (Test-Path $ConfigPath)) {
     throw "ConfigPath not found: $ConfigPath"
 }
 
-$pythonw = (Get-Command pythonw -ErrorAction SilentlyContinue).Source
-if (-not $pythonw) {
-    throw "pythonw executable not found in PATH"
-}
+$python = Resolve-PythonExecutable
 
 $relayPath = Join-Path $CollectorRoot 'relay.py'
 $hiddenLauncherPath = Join-Path $CollectorRoot 'run_collector_hidden.pyw'
@@ -33,7 +79,8 @@ if (-not (Test-Path $hiddenLauncherPath)) {
 
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 
-$taskRun = "`"$pythonw`" `"$hiddenLauncherPath`""
+$pythonArgs = if ($python.Arguments.Count -gt 0) { ' ' + ($python.Arguments -join ' ') } else { '' }
+$taskRun = "`"$($python.Executable)`"$pythonArgs `"$hiddenLauncherPath`""
 
 if ($RunAsCurrentUser) {
     & schtasks.exe /Create /TN $TaskName /SC MINUTE /MO $PollIntervalMinutes /TR $taskRun /F | Out-Host

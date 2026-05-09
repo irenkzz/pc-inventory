@@ -228,7 +228,10 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/smartctl.exe'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/drivedb.h'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/COPYING.smartmontools.txt'));
-        $this->assertStringContainsString('Get-Command pythonw', $collectorInstaller);
+        $this->assertStringContainsString('function Resolve-PythonExecutable', $collectorInstaller);
+        $this->assertStringContainsString("'pythonw', 'python'", $collectorInstaller);
+        $this->assertStringContainsString('Get-Command py -ErrorAction SilentlyContinue', $collectorInstaller);
+        $this->assertStringContainsString('Python runtime was not found', $collectorInstaller);
         $this->assertStringContainsString('run_collector_hidden.pyw', $collectorInstaller);
         $this->assertStringContainsString('install_collector.ps1', $collectorSiteInstaller);
         $this->assertStringContainsString('sharedRoot reachable and read/write probe succeeded', $collectorSiteInstaller);
