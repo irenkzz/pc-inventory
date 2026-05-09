@@ -381,3 +381,9 @@ Boundary confirmations:
 - No DNS change occurred.
 - No production cutover was approved.
 - No `.env` values, `APP_KEY`, DB password, token secrets, token hashes, bearer tokens, raw CSV contents, command payload JSON, full configs, or full runner GUIDs were printed or recorded.
+
+## 16. Phase 19H transfer planning follow-up
+
+Phase 19H app-aware SQLite-to-MariaDB transfer planning is documented in `docs/MARIADB_REHEARSAL_TRANSFER_PLAN.md`.
+
+Phase 19H is Option A documentation-only. It recommends a future dry-run-only command named `php artisan inventory:mariadb-rehearsal-transfer` with explicit `--source="D:\inventory-rehearsal\source-copy\database.sqlite"` and no silent default source. It does not implement the command, run transfer, reset/truncate tables, dump MariaDB, restore into `inventory_rehearsal_restore`, expose a web endpoint, run operational validation, change live config, or approve cutover.

@@ -281,6 +281,8 @@ Phase 19F Supermicro runtime validation is complete. MariaDB service is `Running
 
 Phase 19G empty Laravel schema migration on the MariaDB rehearsal DB is complete. The real rehearsal `.env` exists only at `D:\inventory-rehearsal\laravel\.env`; the new rehearsal `APP_KEY` and DB password were not printed or recorded. Migrations ran only from the rehearsal Laravel path, `php artisan migrate` succeeded, all migrations show `Ran`, and `inventory_rehearsal` has `20` tables while `inventory_rehearsal_restore` remains empty. No app data transfer, SQLite-to-MySQL conversion, web serving, package generation, proxy/DNS change, runner/collector traffic change, live config change, production data mutation, cutover approval, or secret exposure occurred.
 
+Phase 19H app-aware transfer planning is documented in `docs/MARIADB_REHEARSAL_TRANSFER_PLAN.md`. It does not implement or execute transfer; it preserves the Phase 19G empty migrated schema state until a later reviewed dry-run command phase.
+
 Placeholder example:
 
 ```env
