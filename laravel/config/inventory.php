@@ -22,4 +22,6 @@ return [
     'central_intake_token' => env('INVENTORY_CENTRAL_INTAKE_TOKEN'),
     'runner_target_version' => env('INVENTORY_RUNNER_TARGET_VERSION', '1.0.21'),
     'direct_command_redelivery_minutes' => env('INVENTORY_DIRECT_COMMAND_REDELIVERY_MINUTES', 3),
+    'install_preflight_base_path_override' => env('INVENTORY_INSTALL_PREFLIGHT_BASE_PATH_OVERRIDE'),
+    'install_preflight_hostname_override' => env('INVENTORY_INSTALL_PREFLIGHT_HOSTNAME_OVERRIDE'),
 ];
