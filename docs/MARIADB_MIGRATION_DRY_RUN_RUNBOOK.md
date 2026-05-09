@@ -403,6 +403,8 @@ Phase 19C follow-up: `docs/MARIADB_REHEARSAL_ENVIRONMENT_SETUP_CHECKLIST.md` doc
 
 Phase 19D follow-up: `tools/Prepare-MariaDbRehearsalFilesystem.ps1` provides an optional dry-run-by-default helper for the Phase 19C filesystem-only preparation. The helper must be copied/run manually on Supermicro for execution and remains pre-migration only: no MariaDB/MySQL install, DB/user creation, migrations, real `.env`, app data transfer, web endpoint exposure, package generation, runner/collector traffic changes, or cutover approval.
 
+Phase 19D Supermicro validation completed with expected `WARN`: dry-run reported skipped optional SQLite/raw archive/download copies, and `-Execute` created the rehearsal filesystem/source layout plus `.env.rehearsal.example` and non-secret notes without DB install, migrations, real `.env`, package generation, runner/collector traffic changes, or secret exposure.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:
