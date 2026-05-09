@@ -176,7 +176,11 @@ Validation passed with the PowerShell parser check, `tests/powershell/Test-Direc
 
 ## 9. Future Collector-site Installer Responsibilities
 
-A future Collector-site Installer should prepare a branch collector installation and mode-specific runner staging area. Eventual responsibilities include:
+Phase 18E adds the Collector-site Installer MVP at `collector/install_collector_site.ps1`. It is a conservative PowerShell wrapper, not a full installer framework or GUI. It validates an already generated collector-share site package/config, requires elevated PowerShell, checks HTTPS `/health` with normal TLS validation, validates branch-share reachability with a temporary probe file, verifies runner staging presence or warns clearly, backs up the local collector config, delegates Scheduled Task installation to `install_collector.ps1`, verifies the collector task and config, writes a local installer log, and prints a redacted support summary plus portal verification steps.
+
+The wrapper refuses Direct HTTPS runner configs, missing collector identity, plain HTTP, localhost/loopback, example, placeholder, and `inventory.example.local` URLs. It never uses `-SkipCertificateCheck`, does not call collector status/heartbeat/CSV/ACK/command APIs, does not write operational CSV/ACK/command/heartbeat files, does not trigger runner commands or repair/update, and does not change collector or Direct HTTPS runtime behavior.
+
+Current responsibilities include:
 
 - Create or validate branch-share folder structure.
 - Install collector files.
@@ -192,6 +196,8 @@ A future Collector-site Installer should prepare a branch collector installation
 - Produce a redacted support summary.
 
 Collector-share behavior must be preserved. The collector-site installer must not introduce Direct HTTPS assumptions into collector-share mode.
+
+Generated collector-share site kits include the wrapper additively through the existing collector package folder. Direct HTTPS packages remain without collector files. Config schema and token handling are unchanged. Source validation passed with the PowerShell parser check, `tests/powershell/Test-CollectorSiteInstaller.ps1`, `tests/powershell/Test-DirectHttpsInstaller.ps1`, and targeted Laravel package tests. Supermicro/live collector validation is still required after reviewed pull.
 
 ## 10. Built-in Preflight/Readiness Checks
 
@@ -262,7 +268,7 @@ Support summaries should use redacted labels, partial non-secret identifiers, ti
 - Phase 18B - Installer/server preflight command. Status: implemented, validated on Supermicro, documented.
 - Phase 18C - Portal Setup Wizard MVP. Status: implemented, validated on Supermicro, documented.
 - Phase 18D - Direct HTTPS Runner Installer MVP. Status: implemented, live-validated with manual Scheduled Task trigger, documented.
-- Phase 18E - Collector-site Installer MVP. Status: next candidate.
+- Phase 18E - Collector-site Installer MVP. Status: implemented in source; Supermicro/live collector validation still required after pull.
 - Then return to MariaDB migration runbook and rehearsal.
 
 The roadmap intentionally keeps setup productization separate from production database migration and cutover approval.
