@@ -678,3 +678,20 @@ It is read-only and focuses on deciding whether `referenced_evidence_missing_cou
 Manual Supermicro review completed with Outcome A: `referenced_evidence_missing_count=353` is explained by path-shape/path-mapping behavior, not missing raw evidence. The copied raw archive contains `563` files, `raw_files` has `353` rows, all `353` `saved_path` basenames exist uniquely in the copied archive, and `unresolved_after_suffix_review=0`.
 
 Phase 19K should be architecture/design for execute-mode transfer with explicit raw evidence path handling. Basename/suffix resolution was unique for the current copied archive, but future implementation must not silently rely on basename-only matching unless uniqueness is proven.
+
+## 30. Phase 19K execute-mode design
+
+Phase 19K execute-mode transfer architecture/design is documented in `docs/MARIADB_REHEARSAL_EXECUTE_MODE_DESIGN.md`.
+
+The design remains documentation-only. It does not approve `--execute`, data transfer, table reset/truncate, MariaDB dump/restore, web exposure, package/site-kit generation, live config changes, runner/collector traffic changes, production migration, or cutover.
+
+Key design decisions:
+
+- First execute implementation must be no-reset and empty-target only.
+- A manual dump marker/path is mandatory before any future execute mode.
+- `classification_rules=8` is compare-only and target-preserved when source/target identifiers and safe checksums match.
+- Raw evidence handling must preserve original `raw_files.saved_path` and derive rehearsal/archive mapping only for validation.
+- Basename/suffix resolution was unique for the current copied archive, but future implementation must not silently rely on basename-only matching unless uniqueness is proven.
+- Optional missing tables remain WARN/skip only when absent in both source and target.
+
+Next safe phase: Phase 19L read-only execute-readiness hardening, diagnostics, and tests only; no writes.

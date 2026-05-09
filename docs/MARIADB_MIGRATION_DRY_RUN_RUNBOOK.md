@@ -423,6 +423,8 @@ Phase 19J is the read-only evidence review phase for the Phase 19I warning `refe
 
 Phase 19J manual Supermicro review concluded Outcome A: the raw evidence warning is explained by path-shape/path-mapping behavior, not missing copied evidence. Execute-mode transfer and cutover remain unapproved.
 
+Phase 19K follow-up: `docs/MARIADB_REHEARSAL_EXECUTE_MODE_DESIGN.md` documents execute-mode architecture/design boundaries only. It records no-reset empty-target policy, dump-before-execute requirement, `classification_rules` compare-only handling, raw evidence path mapping policy, optional/schema difference policies, pre-execute gates, transfer order, and post-execute validation requirements. It does not approve `--execute`, data transfer, table reset/truncate, dump/restore execution, package generation, live config changes, runner/collector traffic changes, production migration, or cutover.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:
