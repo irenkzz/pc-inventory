@@ -261,3 +261,11 @@ Boundaries:
 - Execute-mode transfer remains unapproved.
 - Production cutover remains unapproved.
 - No code, tests, helper scripts, temporary logs, data transfer, table reset/truncate, dump, restore, web endpoint, package/site-kit generation, live config change, live SQLite read/mutation, MariaDB application-table writes, runner/collector traffic change, command lifecycle change, Direct `repair_update`, secret exposure, raw CSV exposure, command payload JSON exposure, full config exposure, or full runner GUID exposure occurred.
+
+## 10. Phase 19K follow-up
+
+Phase 19J Outcome A feeds into Phase 19K raw evidence path policy in `docs/MARIADB_REHEARSAL_EXECUTE_MODE_DESIGN.md`.
+
+Phase 19K documents that future execute-mode design must preserve original `raw_files.saved_path`, derive rehearsal archive resolution only for validation, require uniqueness checks before basename/suffix matching is trusted, and fail closed on ambiguous or unresolved evidence references.
+
+Phase 19J did not approve execute transfer, restore rehearsal, production migration, or cutover.

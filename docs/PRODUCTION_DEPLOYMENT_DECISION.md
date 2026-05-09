@@ -39,6 +39,8 @@ Phase 19J follow-up: dry-run evidence review is documented for the unresolved `r
 
 Manual Phase 19J review concluded Outcome A: `referenced_evidence_missing_count=353` is a path-shape/path-mapping issue, not missing copied evidence. Phase 19K should review execute-mode design boundaries and raw evidence path handling before implementation. This does not approve transfer execution, restore rehearsal, live DB driver switching, live `.env` changes, package generation, runner/collector traffic changes, or cutover.
 
+Phase 19K follow-up: execute-mode transfer design is documented in `docs/MARIADB_REHEARSAL_EXECUTE_MODE_DESIGN.md`. Phase 19K is design-only and records no-reset empty-target policy, dump-before-execute requirement, `classification_rules` compare-only handling, raw evidence path handling, optional/schema difference policies, pre-execute gates, and post-execute validation requirements. It does not approve transfer execution, restore rehearsal, live DB driver switching, live `.env` changes, package generation, runner/collector traffic changes, production migration, or cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
