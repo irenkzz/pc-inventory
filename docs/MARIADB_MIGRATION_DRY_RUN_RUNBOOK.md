@@ -397,6 +397,8 @@ Phase 19A does not approve production cutover.
 
 Do not switch the live Supermicro app from SQLite to MariaDB/MySQL during Phase 19A. Do not change the live `.env`, mutate production data, point live runners or collectors at a rehearsal database, or announce the MariaDB/MySQL database as production.
 
+Phase 19B follow-up: `docs/MARIADB_REHEARSAL_ENVIRONMENT_PREP.md` documents the recommended non-production rehearsal layout at `D:\inventory-rehearsal`, including separate Laravel path, source-copy locations, rehearsal `.env` handling, local-only `APP_URL`, and no-live-runner/collector guardrails.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:
