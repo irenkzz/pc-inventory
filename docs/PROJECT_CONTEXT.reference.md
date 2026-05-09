@@ -41,6 +41,7 @@ Current implemented state:
 - read-only Direct HTTPS runner triage command exists: `php artisan inventory:direct-runner-triage {runnerId}`
 - read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
 - read-only installer/server preflight command exists: `php artisan inventory:install-preflight`
+- authenticated read-only Portal Setup Wizard MVP page exists at `/setup-wizard`
 - Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`
 - Phase 18A installation productization strategy is documented in `docs/INSTALLATION_PRODUCTIZATION_STRATEGY.md`
 - generated site kit and branch package include bundled `smartctl.exe` support for best-effort SSD health/TBW probing
@@ -413,15 +414,16 @@ Practical status of update flow:
 - badly broken or historically mis-permissioned installs may still require one corrective reinstall
 - some older machines may have ACL/task-state baggage that makes portal self-repair unreliable until corrected once locally
 
-## Direct HTTPS Operational Commands
+## Operational Commands
 
-Current read-only Direct HTTPS operational command set:
+Current read-only operational command set:
 
 ```powershell
 php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage {runnerId}
 php artisan inventory:production-readiness
+php artisan inventory:install-preflight
 ```
 
 `inventory:direct-site-kit-audit` was completed in Phase 16A and validated on Supermicro. It audits generated Direct HTTPS site-kit artifacts for safe pilot use, including Direct HTTPS transport, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction. It passed with an acceptable `WARN` because `collectorName` is present but is not required for Direct HTTPS active transport.
@@ -509,7 +511,15 @@ Phase 17A tests:
 
 Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`. It is planning/documentation only, not cutover approval. It keeps SQLite pilot-only, recommends MariaDB/MySQL on Supermicro as the production DB target, recommends IIS + PHP FastCGI for Windows production serving, keeps HPE StoreEasy as TLS termination reverse proxy for now, and requires backup plus restore testing before production cutover. It does not change code, runner/collector behavior, API contracts, command semantics, Direct `repair_update`, token UI, production data, `.env`, or generated artifacts.
 
-Phase 18B adds `php artisan inventory:install-preflight`, a Laravel-only read-only preflight for future productized installation/setup/package flows. It checks host/path identity, APP_URL/HTTPS readiness, storage and package paths, operational command availability, Supermicro-only official package/site-kit generation safety, setup wizard readiness notes, MVP manual boundaries, and secret-redaction rules. It does not run nested Artisan commands, migrations, backups, package/site-kit generation, token registration/rotation, runner commands, or Direct HTTPS API changes.
+Phase 18B `inventory:install-preflight` is implemented, validated on Supermicro, and documented. It is a Laravel-only read-only preflight for future productized installation/setup/package flows. It checks Environment, Laravel Host, Application URL / HTTPS, Storage and Package Paths, Operational Commands, Package / Site-kit Generation Safety, Direct HTTPS Productization Notes, Collector-share Productization Notes, Setup Wizard Readiness, MVP Manual Boundaries, Security / Secret Redaction, Recommended Next Checks, and Result.
+
+Phase 18B safety: it is not an installer and not the portal setup wizard. It does not generate packages, site kits, backups, or tokens; does not mutate database records; does not write files; does not run migrations or nested Artisan commands; does not change `.env`; and does not expose secrets.
+
+Phase 18B Supermicro validation at `D:\inventory\laravel`: host/path was detected as the approved Supermicro active Laravel host, official package/site-kit generation was allowed only on that host, `APP_URL` used HTTPS and was not placeholder/example or localhost/loopback, Laravel storage/inventory/downloads/raw archive/backup paths were readable and writable, required operational commands and optional package/profile/backup commands were detected, Direct HTTPS was described as small/no-IT transport, collector-share was described as main HQ/multi-PC mode, Setup Wizard MVP was reported as not implemented yet, secrets were not printed, and final result was `WARN`. Expected warnings were `APP_ENV=local`, `APP_DEBUG=true`, pilot/internal hostname, CLI inability to fully prove trusted proxy headers, backup policy/restore rehearsal not verified, and Setup Wizard MVP not implemented.
+
+Phase 18B tests: `Tests\Feature\InstallPreflightCommandTest` passed with 21 tests and 56 assertions. The full Laravel suite passed after implementation with 245 tests and 1061 assertions.
+
+Phase 18C adds an authenticated read-only Portal Setup Wizard MVP at `/setup-wizard`. It guides the seven-step productized setup flow, references `inventory:install-preflight` and `inventory:direct-site-kit-audit` without running nested Artisan commands, shows safe existing site/runner/collector counts, explains Direct HTTPS, collector-share, and hybrid deployment modes, links to existing runners/collectors/commands/downloads verification pages, and repeats redaction rules. It does not create users, organization/company schema, sites, tokens, packages, site kits, backups, migrations, runner commands, or production approval, and it does not change runner/collector behavior, Direct HTTPS API contracts, command lifecycle semantics, `.env`, generated artifacts, or secrets.
 
 Operational safety notes:
 
@@ -521,7 +531,7 @@ Operational safety notes:
 - CSV files are archived evidence only.
 - Google Drive is backup/sync only.
 - Official site kits/packages are generated only on Supermicro.
-- Do not print token secrets, bearer tokens, token hashes, DB credentials, Google credentials, raw CSV contents, command payload JSON, or full runner GUIDs.
+- Do not print token secrets, bearer tokens, token hashes, DB credentials, Google credentials, raw CSV contents, command payload JSON, `.env` values, `APP_KEY` values, full configs, or full runner GUIDs.
 
 ## SSD Telemetry / TBW Context
 
@@ -648,13 +658,14 @@ Still operationally sensitive:
 1. run `php artisan inventory:doctor`
 2. run `php artisan inventory:doctor --production` before cutover
 3. run `php artisan inventory:production-readiness` before moving beyond pilot mode
-4. keep backups of:
+4. run `php artisan inventory:install-preflight` before productized setup/package generation review
+5. keep backups of:
    - Laravel DB
    - raw archives
    - generated downloads/site kits
    - site tokens
    - legacy DB
-5. freeze legacy writes before final parity/cutover if full migration is performed
+6. freeze legacy writes before final parity/cutover if full migration is performed
 
 ## Useful Laravel Commands
 
@@ -668,6 +679,7 @@ php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage IT-ADMIN
 php artisan inventory:production-readiness
+php artisan inventory:install-preflight
 php artisan inventory:import-folder ..\..\inventaris_py\sample_data
 php artisan inventory:compare-legacy ..\..\inventaris_py\data\inventory.db
 php artisan inventory:register-site-token SITE-HQ

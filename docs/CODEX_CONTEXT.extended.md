@@ -45,6 +45,7 @@ Current known package/state:
 - Phase 16B.1 refined runner triage so old failed commands superseded by later success do not force `ATTENTION`
 - Phase 17A read-only production readiness checklist command exists: `php artisan inventory:production-readiness`
 - Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`
+- Phase 18B read-only installer/server preflight command exists: `php artisan inventory:install-preflight`
 - collector-share mode remains supported and unaffected
 
 ## Laravel Responsibilities
@@ -232,13 +233,14 @@ Direct HTTPS commands are also asynchronous:
 - ACK is the execution result
 - Direct `repair_update` remains blocked for Direct HTTPS MVP
 
-Current Direct HTTPS operational command set:
+Current operational command set:
 
 ```powershell
 php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage {runnerId}
 php artisan inventory:production-readiness
+php artisan inventory:install-preflight
 ```
 
 Phase 16A `inventory:direct-site-kit-audit` is read-only and was validated on Supermicro. It audits generated Direct HTTPS site-kit artifacts for transport mode, HTTPS endpoint, stale HTTP endpoint, placeholder endpoint, runner version `1.0.22`, config/README presence, collector-share isolation, and secret redaction. The Supermicro audit passed with an acceptable `WARN` because `collectorName` is present but not required for Direct HTTPS active transport.
@@ -269,6 +271,12 @@ Expected Phase 17A warnings currently include non-production env/debug state, un
 Phase 17A safety: no nested Artisan commands, DB mutation, file writes, cache/config clearing, migrations, runner/collector file access, backup generation, site-kit generation, command triggering, Direct HTTPS API contract changes, command polling/ACK semantic changes, Direct `repair_update` enablement, collector-share behavior changes, or secret printing.
 
 Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`. It is planning/documentation only and does not approve cutover. It keeps SQLite pilot-only, recommends MariaDB/MySQL on Supermicro as the production DB target, recommends IIS + PHP FastCGI for Windows production serving, keeps HPE StoreEasy as TLS termination reverse proxy for now, and requires backup plus restore testing before cutover. It does not change code, runner/collector behavior, API contracts, command semantics, Direct `repair_update`, token UI, production data, `.env`, or generated artifacts.
+
+Phase 18B `inventory:install-preflight` is implemented, validated on Supermicro, and documented. It is a Laravel-only read-only Artisan command for future productized installation, setup wizard, and package/site-kit generation flows. It checks Environment, Laravel Host, Application URL / HTTPS, Storage and Package Paths, Operational Commands, Package / Site-kit Generation Safety, Direct HTTPS and collector-share productization notes, Setup Wizard readiness, MVP manual boundaries, secret-redaction rules, recommended next checks, and final Result.
+
+Phase 18B Supermicro validation at `D:\inventory\laravel`: the approved Supermicro host/path was detected, official package/site-kit generation was allowed only there, `APP_URL` used HTTPS and was not placeholder/example or localhost/loopback, storage/downloads/raw archive/backup paths were readable and writable, required and optional operational commands were detected without running nested Artisan commands, Direct HTTPS remained the small/no-IT transport, collector-share remained the main HQ/multi-PC mode, Setup Wizard MVP was reported as not implemented yet, secrets were not printed, and final result was `WARN`. Expected warnings were local/debug pilot state, pilot/internal hostname, trusted proxy headers not fully provable from CLI, backup/restore rehearsal policy not verified, and Setup Wizard MVP not implemented. Tests passed: `Tests\Feature\InstallPreflightCommandTest` 21 tests/56 assertions; full Laravel suite 245 tests/1061 assertions.
+
+Phase 18B safety: it is not an installer and not the portal setup wizard. It does not generate packages, site kits, backups, or tokens; does not mutate database records; does not write files; does not run migrations; does not run nested Artisan commands; does not change `.env`; does not expose secrets; does not change Direct HTTPS API contracts; does not change command lifecycle semantics; and does not enable Direct `repair_update`.
 
 ## Runner Rename / GUID Behavior
 
@@ -334,6 +342,7 @@ php artisan inventory:direct-pilot-status
 php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage IT-ADMIN
 php artisan inventory:production-readiness
+php artisan inventory:install-preflight
 php artisan inventory:import-folder ..\..\inventaris_py\sample_data
 php artisan inventory:compare-legacy ..\..\inventaris_py\data\inventory.db
 php artisan inventory:register-site-token SITE-HQ

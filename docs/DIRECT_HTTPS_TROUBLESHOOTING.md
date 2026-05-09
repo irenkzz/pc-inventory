@@ -28,6 +28,7 @@ php artisan inventory:direct-site-kit-audit
 php artisan inventory:direct-runner-triage IT-ADMIN
 php artisan inventory:direct-runner-triage LAPTOP-I76TA97E
 php artisan inventory:production-readiness
+php artisan inventory:install-preflight
 ```
 
 `inventory:direct-pilot-status` summarizes the Direct HTTPS pilot fleet from Laravel database state.
@@ -81,6 +82,14 @@ Phase 17A validation tests: `Tests\Feature\ProductionReadinessCommandTest` passe
 Safety: the command does not run nested Artisan commands, mutate DB records, write files, clear cache/config, run migrations, touch runner/collector files, generate backups, generate site kits, trigger commands, change Direct HTTPS API contracts, change command polling/ACK semantics, enable Direct `repair_update`, modify collector-share behavior, or print secrets.
 
 Phase 17B production deployment decision is documented in `docs/PRODUCTION_DEPLOYMENT_DECISION.md`. It keeps Direct HTTPS as the small/no-IT transport, keeps collector-share as the main HQ/multi-PC mode, keeps HPE StoreEasy as TLS termination reverse proxy for now, and documents the recommended production DB/web/TLS/backup model without changing runner, collector, API, command lifecycle, Direct `repair_update`, production data, `.env`, generated artifacts, or secrets.
+
+`inventory:install-preflight` was completed in Phase 18B. It is a Laravel-only read-only installer/server preflight for future productized installation, setup wizard, and package/site-kit generation flows. It is not an installer and not the portal setup wizard. It does not generate packages, site kits, backups, or tokens; does not mutate database records; does not write files; does not run migrations or nested Artisan commands; does not change `.env`; and does not expose secrets.
+
+The command checks Environment, Laravel Host, Application URL / HTTPS, Storage and Package Paths, Operational Commands, Package / Site-kit Generation Safety, Direct HTTPS Productization Notes, Collector-share Productization Notes, Setup Wizard Readiness, MVP Manual Boundaries, Security / Secret Redaction, Recommended Next Checks, and Result.
+
+Phase 18B Supermicro validation at `D:\inventory\laravel` produced `Result: WARN`. The approved Supermicro host/path was detected, official package/site-kit generation was allowed only there, HTTPS `APP_URL` was accepted, storage/downloads/raw archive/backup paths were readable and writable, required and optional operational commands were detected, nested Artisan commands were not run, no packages/site kits/backups/tokens were generated, Direct HTTPS remained the small/no-IT transport, collector-share remained the main HQ/multi-PC mode, Setup Wizard MVP was reported as not implemented yet, and secrets were not printed. Expected warnings were `APP_ENV=local`, `APP_DEBUG=true`, pilot/internal hostname, trusted proxy headers not fully provable from CLI, backup/restore rehearsal policy not verified, and Setup Wizard MVP not implemented.
+
+Phase 18B validation tests: `Tests\Feature\InstallPreflightCommandTest` passed with 21 tests and 56 assertions. The full Laravel suite passed after implementation with 245 tests and 1061 assertions.
 
 ## Endpoint And DNS Failures
 
