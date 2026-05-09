@@ -418,5 +418,5 @@ Live runner validation:
 6. Keep Direct HTTPS rollout focused on small/no-IT sites first.
 7. Phase 18C Portal Setup Wizard MVP is done.
 8. Phase 18D Direct HTTPS Runner Installer MVP is done; continue normal scheduled-interval monitoring for Direct HTTPS runners.
-9. Plan Phase 18E Collector-site Installer MVP.
+9. Phase 18E Collector-site Installer MVP is implemented in source and keeps Direct HTTPS behavior unaffected; Supermicro/live collector validation is still required after pull.
 10. Later return to MariaDB migration runbook and rehearsal.

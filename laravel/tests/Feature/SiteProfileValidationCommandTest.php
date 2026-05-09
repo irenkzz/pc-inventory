@@ -218,9 +218,11 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertStringContainsString('Require-ScheduledTask "InternalInventoryRunner"', $installer);
 
         $collectorInstaller = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/collector/install_collector.ps1'));
+        $collectorSiteInstaller = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/collector/install_collector_site.ps1'));
         $runnerInstaller = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/scripts/install_runner.ps1'));
         $scannerScript = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/scripts/scanner_core_v4.ps1'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/collector/run_collector_hidden.pyw'));
+        $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/collector/install_collector_site.ps1'));
         $this->assertFileDoesNotExist(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/scripts/install_direct_https_runner.ps1'));
         $this->assertFileDoesNotExist(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/branch-share/packages/runner/current/scripts/install_direct_https_runner.ps1'));
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/smartctl.exe'));
@@ -228,6 +230,11 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertFileExists(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/runner/tools/COPYING.smartmontools.txt'));
         $this->assertStringContainsString('Get-Command pythonw', $collectorInstaller);
         $this->assertStringContainsString('run_collector_hidden.pyw', $collectorInstaller);
+        $this->assertStringContainsString('install_collector.ps1', $collectorSiteInstaller);
+        $this->assertStringContainsString('sharedRoot reachable and read/write probe succeeded', $collectorSiteInstaller);
+        $this->assertStringContainsString('Invoke-WebRequest -Uri $healthUrl -UseBasicParsing', $collectorSiteInstaller);
+        $this->assertStringNotContainsString('SkipCertificateCheck', $collectorSiteInstaller);
+        $this->assertStringNotContainsString('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', $output);
         $this->assertStringNotContainsString('powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden', $collectorInstaller);
         $this->assertStringContainsString('schtasks.exe /Create', $collectorInstaller);
         $this->assertStringContainsString('schtasks.exe /Create', $runnerInstaller);
@@ -382,6 +389,7 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertArrayNotHasKey('site_token', $runnerConfig);
 
         $this->assertFileDoesNotExist($buildRoot . '/collector/collector_config.json');
+        $this->assertFileDoesNotExist($buildRoot . '/collector/install_collector_site.ps1');
         $this->assertFileDoesNotExist($buildRoot . '/START_HERE_INSTALL_COLLECTOR_PC.cmd');
         $this->assertFileDoesNotExist($buildRoot . '/INSTALL_COLLECTOR_ONLY.cmd');
         $this->assertFileDoesNotExist($buildRoot . '/INSTALL_COLLECTOR_COMMAND.txt');
