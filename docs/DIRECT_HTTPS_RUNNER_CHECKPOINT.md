@@ -372,6 +372,7 @@ Status:
 - Generated Direct HTTPS `INSTALL_THIS_PC_RUNNER_ONLY.cmd` stages locally, elevates with UAC, and invokes the wrapper with `runner-config.template.json`.
 - Phase 18F adds `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd` as the preferred top-level Direct HTTPS launcher and keeps `INSTALL_THIS_PC_RUNNER_ONLY.cmd` for backward compatibility.
 - Generated Direct HTTPS packages include `README_DIRECT_HTTPS_RUNNER.txt` and do not expose `INSTALL_COLLECTOR_SITE.cmd` as a top-level entry point.
+- Phase 18F status: implemented, Supermicro package-validated, documented.
 
 Safety:
 
@@ -388,8 +389,10 @@ Validation:
 - `tests/powershell/Test-DirectHttpsInstaller.ps1` passed.
 - `Tests\Feature\SiteProfileValidationCommandTest` passed.
 - `Tests\Feature\DirectSiteKitAuditCommandTest` passed and now checks the Direct HTTPS package UX files.
-- Full Laravel test suite passed after implementation: 253 tests, 1125 assertions.
-- Supermicro Direct HTTPS site-kit audit passed with acceptable `WARN`: `collectorName` is present but not required for Direct HTTPS active transport.
+- Full Laravel test suite passed after implementation: 253 tests, 1176 assertions.
+- Supermicro Direct HTTPS package validation built `..\deployment\profiles\site_hq_direct_https.pilot.json`; audit result was `WARN` with acceptable `collectorName` warning.
+- Audit confirmed `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd`, `README_DIRECT_HTTPS_RUNNER.txt`, `runner/scripts/install_direct_https_runner.ps1`, Direct HTTPS transport, `https://inventory-pilot.internal.lan`, HTTPS use, runner version `1.0.22`, README Direct HTTPS/small no-IT/HTTPS certificate/Direct `repair_update` blocked wording, and no obvious rendered secret.
+- Supermicro collector-share package validation built `..\deployment\profiles\generated\SITE-HQ.json` and confirmed `INSTALL_COLLECTOR_SITE.cmd`, `README_COLLECTOR_SITE.txt`, `collector/install_collector_site.ps1`, no top-level `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd`, Python 3.x and branch-share/local SMB README guidance, `/collectors` and `/runners` verification, collector-share command delivery/ACK wording, hybrid boundary wording, and Supermicro-only official generation reminder.
 - Direct HTTPS profile validation passed for `..\deployment\profiles\site_hq_direct_https.pilot.json`.
 
 Live runner validation:
@@ -421,5 +424,5 @@ Live runner validation:
 7. Phase 18C Portal Setup Wizard MVP is done.
 8. Phase 18D Direct HTTPS Runner Installer MVP is done; continue normal scheduled-interval monitoring for Direct HTTPS runners.
 9. Phase 18E Collector-site Installer MVP is implemented and keeps Direct HTTPS behavior unaffected; Phase 18E.1 is done and confirms collector-share MVP requires Python on the managed collector host while small/no-IT sites should use Direct HTTPS mode.
-10. Phase 18F Package UX Simplification and Mode-specific Installer Entry Points is implemented and tested.
-11. Later return to MariaDB migration runbook and rehearsal.
+10. Phase 18F Package UX Simplification and Mode-specific Installer Entry Points is done.
+11. Next: return to MariaDB migration runbook / rehearsal planning.
