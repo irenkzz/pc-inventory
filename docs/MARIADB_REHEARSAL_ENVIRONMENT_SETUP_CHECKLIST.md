@@ -285,6 +285,8 @@ Phase 19H app-aware transfer planning is documented in `docs/MARIADB_REHEARSAL_T
 
 Phase 19I adds the reviewed dry-run-only command `php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory-rehearsal\source-copy\database.sqlite" --dry-run`. It refuses live SQLite paths and live app boundaries, has no `--execute`, and does not write rows, reset tables, dump, restore, expose web endpoints, generate packages, or change runner/collector traffic.
 
+Phase 19I Supermicro validation confirmed the command remains dry-run-only: `Result: WARN`, no execute mode, no data writes, source/target boundary checks passed, `inventory_rehearsal_restore` stayed empty, missing `--source` failed, and live SQLite source was refused.
+
 Placeholder example:
 
 ```env

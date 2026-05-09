@@ -62,6 +62,8 @@ Phase 19H transfer planning is documented in `docs/MARIADB_REHEARSAL_TRANSFER_PL
 
 Phase 19I adds dry-run-only Artisan command `inventory:mariadb-rehearsal-transfer` with required explicit copied SQLite `--source` and required `--dry-run`. It has no `--execute` mode and performs read-only validation/preview only.
 
+Phase 19I Supermicro dry-run validation completed with expected `WARN`: no data was written, live SQLite was refused as a source, missing `--source` failed as expected, and review items were limited to optional missing tables, pre-existing target `classification_rules`, skipped optional raw/storage columns, and `referenced_evidence_missing_count=353`.
+
 ## 3. Recommended rehearsal environment layout
 
 Recommended layout: same Supermicro host with a separate Laravel copy/path.

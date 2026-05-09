@@ -417,6 +417,8 @@ Phase 19H app-aware SQLite-to-MariaDB transfer planning is documented in `docs/M
 
 Phase 19I implements dry-run-only command `php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory-rehearsal\source-copy\database.sqlite" --dry-run`. It requires explicit `--source` and `--dry-run`, has no `--execute`, and performs read-only source/target validation and previews only.
 
+Phase 19I Supermicro dry-run validation completed with expected `WARN`. Hard boundaries passed, source SQLite integrity/readability passed, MariaDB target schema was reachable, `inventory_rehearsal_restore` remained empty, main counts/relationships/JSON summaries were produced without secrets, and guardrails failed as expected for missing `--source` and live SQLite source.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:

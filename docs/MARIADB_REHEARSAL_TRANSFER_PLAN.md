@@ -535,3 +535,136 @@ Command boundaries:
 - `inventory_rehearsal_restore` must remain empty.
 
 The command is read-only. It performs validation and previews only; it does not transfer data, reset/truncate tables, dump MariaDB, restore MariaDB, write reports by default, expose a web endpoint, generate packages/site kits, change live config, read live SQLite, mutate live SQLite, change runner/collector traffic, change command lifecycle semantics, or enable Direct `repair_update`.
+
+## 28. Phase 19I Supermicro dry-run validation
+
+Phase 19I status: implemented, tested, pushed, and Supermicro dry-run validated with expected `WARN`.
+
+Runtime command:
+
+```powershell
+php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory-rehearsal\source-copy\database.sqlite" --dry-run
+```
+
+Runtime result:
+
+```text
+Result: WARN
+```
+
+Validated hard boundaries:
+
+- Dry-run only message was shown.
+- No execute mode exists.
+- No data was written.
+- `--dry-run` supplied: `OK`.
+- `--source` supplied: `OK`.
+- `--execute` option absent: `OK`.
+- Laravel base path is the rehearsal path: `OK`.
+- `DB_CONNECTION` is `mysql`: `OK`.
+- `DB_DATABASE` is `inventory_rehearsal`: `OK`.
+- `APP_URL` does not contain live pilot hostname: `OK`.
+- Source SQLite exists, is non-zero, readable, and opened for read-only inspection.
+- Source SQLite integrity/readability check passed.
+- Source table count: `20`.
+- MariaDB target reachable.
+- Required migrated target schema present.
+- Target migrations row count: `18`.
+- `inventory_rehearsal_restore` exists and is empty.
+
+Main source row counts:
+
+- `users=1`
+- `devices=37`
+- `device_identities=160`
+- `device_scans=353`
+- `hardware_snapshots=353`
+- `storage_health_observations=694`
+- `network_observations=353`
+- `peripherals=5501`
+- `device_assignments=86`
+- `change_log=1337`
+- `raw_files=353`
+- `collector_sites=1`
+- `collectors=3`
+- `runners=38`
+- `runner_commands=113`
+- `classification_rules=8`
+
+Subset summaries:
+
+- Direct HTTPS runner count: `2`.
+- Collector-share runner count: `36`.
+- Collector count: `3`.
+- Pending command count: `0`.
+- Delivered/dispatched awaiting ACK count: `6`.
+- Failed command count: `6`.
+- Succeeded command count: `3`.
+- Latest scan per device count: `37`.
+- Raw files with missing archive path count: `0`.
+- Devices with latest snapshot count: `37`.
+- Device assignment override count: `86`.
+- Token metadata count without values: `0`.
+
+Validation summary:
+
+- Main source and target application tables are present.
+- Target current row counts are mostly zero before transfer.
+- Main relationship checks passed.
+- JSON/text decode checks passed for `hardware_snapshots.snapshot_json`, `raw_files.metadata_json`, `collectors.raw_status_json`, `runners.raw_state_json`, `runner_commands.payload_json`, `storage_health_observations.risk_reasons`, and command payload presence/decode checks.
+- `raw_files_count=353`.
+- `raw_archive_reference_populated_count=353`.
+- `missing_archive_path_reference_count=0`.
+- `copied_raw_archive_root_exists=yes`.
+- `referenced_evidence_missing_count=353`.
+- Assignment links valid: `86`.
+- Assignment rows with missing device link: `0`.
+
+WARN review items before any execute-mode phase:
+
+- Optional source/target `site_tokens` table absent.
+- Optional source/target `department_cleanup_rules` table absent.
+- Optional source/target `site_cleanup_rules` table absent.
+- `classification_rules` already has `8` rows in the target.
+- `raw_files` relationship checks skipped because `raw_files.device_scan_id` / `raw_files.device_id` columns were missing.
+- `storage_health_observations.raw_json` check skipped because the column was missing.
+- `referenced_evidence_missing_count=353` must be reviewed before any execute-mode phase.
+
+Guardrail validation:
+
+```powershell
+php artisan inventory:mariadb-rehearsal-transfer --dry-run
+```
+
+Result: `FAIL`. Reason: `--source` is required and must be explicit.
+
+```powershell
+php artisan inventory:mariadb-rehearsal-transfer --source="D:\inventory\laravel\database\database.sqlite" --dry-run
+```
+
+Result: `FAIL`. Reasons:
+
+- Source path is the live SQLite database and is refused.
+- Source path is under the live Laravel path and is refused.
+- Source path must be the copied rehearsal SQLite source.
+
+Boundary confirmations:
+
+- No `--execute` option exists.
+- No data transfer occurred.
+- No rows were inserted/updated/deleted in MariaDB.
+- No tables were reset/truncated.
+- No MariaDB dump occurred.
+- No restore occurred.
+- No web endpoint was exposed.
+- No `php artisan serve` was run.
+- No package/site-kit generation occurred.
+- No live `.env` change occurred.
+- No live `APP_URL` change occurred.
+- No live DB driver change occurred.
+- Live SQLite was not mutated.
+- Live SQLite was refused as a source.
+- No runner/collector traffic changed.
+- No runner/collector/API/command lifecycle behavior changed.
+- Direct `repair_update` remains blocked.
+- No `.env` values, `APP_KEY`, DB credentials, token secrets, token hashes, bearer tokens, raw CSV contents, command payload JSON, full configs, or full runner GUIDs were printed or recorded.
