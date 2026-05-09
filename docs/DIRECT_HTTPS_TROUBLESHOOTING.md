@@ -346,6 +346,47 @@ Get-ScheduledTask | Where-Object { $_.TaskName -match 'Collector|InventoryCollec
 
 Do not re-enable collector while validating Direct HTTPS.
 
+## Direct HTTPS Installer MVP
+
+Phase 18D adds `runner/scripts/install_direct_https_runner.ps1` for Direct HTTPS runner packages. Use it only with already generated Direct HTTPS runner configs.
+
+Expected behavior:
+
+- Requires elevated PowerShell.
+- Refuses collector-share or unknown transport configs.
+- Requires `transport_mode=direct_https`.
+- Requires an HTTPS `serverBaseUrl`.
+- Refuses HTTP, localhost, loopback, example, placeholder, and `inventory.example.local` endpoints.
+- Checks `serverBaseUrl + /health` using normal TLS validation.
+- Does not use `-SkipCertificateCheck`.
+- Backs up an existing installed config before overwrite.
+- Preserves existing `runnerGuid` and prints only a redacted suffix.
+- Delegates installation to `install_runner.ps1`.
+- Verifies the Scheduled Task and installed Direct HTTPS config.
+- Writes an installer log under `C:\ProgramData\InternalInventoryRunner\logs` when available, otherwise `%TEMP%`.
+
+Normal install from an extracted Direct HTTPS package:
+
+```text
+INSTALL_THIS_PC_RUNNER_ONLY.cmd
+```
+
+That launcher stages the package locally, asks for administrator approval, and invokes the wrapper with `runner-config.template.json`.
+
+Manual wrapper run from an extracted Direct HTTPS package:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\runner\scripts\install_direct_https_runner.ps1 -ConfigPath .\runner\config\runner-config.template.json -UseComputerNameAsRunnerId
+```
+
+If installation fails after a backup was created, restore by copying the `.bak-YYYYMMDD-HHMMSS` file back to:
+
+```text
+C:\ProgramData\InternalInventoryRunner\config\runner-config.json
+```
+
+Do not paste installer logs that contain raw configs. Support summaries should include only runner ID, transport mode, version, server URL, masked runner GUID suffix, Scheduled Task status, HTTPS health result, and log path.
+
 ## Portal Checklist
 
 Open:

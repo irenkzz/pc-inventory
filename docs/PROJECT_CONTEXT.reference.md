@@ -616,6 +616,7 @@ Completed or materially implemented:
 - downloadable site-kit generation
 - current-user runner deployment model
 - hidden collector and runner launcher support
+- Direct HTTPS runner installer wrapper MVP
 - SSD telemetry ingestion/display plumbing
 - per-disk storage health ingest, scoring, and portal visibility
 - substantial feature and unit test coverage
@@ -698,7 +699,7 @@ php artisan inventory:backup --label=pre-cutover
 
 - SQLite is still acceptable for local development and pilot, but long-term production DB choice is not finalized.
 - Direct `repair_update` remains blocked for Direct HTTPS MVP.
-- Direct HTTPS rollout remains manual package refresh/reinstall for now.
+- Direct HTTPS rollout remains manual package refresh/reinstall for now; Phase 18D adds a Direct HTTPS installer wrapper but still requires Supermicro package validation and live runner validation after pull.
 - token rotation UI is still not done.
 - per-runner token enrollment is still not done.
 - some SSD telemetry gaps are expected on RAID/RST-backed clients.
