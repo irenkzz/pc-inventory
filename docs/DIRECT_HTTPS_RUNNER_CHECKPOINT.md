@@ -370,6 +370,8 @@ Status:
 - Verifies the Scheduled Task and installed Direct HTTPS config after install.
 - Writes a local installer log and prints a redacted support summary plus portal verification instructions.
 - Generated Direct HTTPS `INSTALL_THIS_PC_RUNNER_ONLY.cmd` stages locally, elevates with UAC, and invokes the wrapper with `runner-config.template.json`.
+- Phase 18F adds `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd` as the preferred top-level Direct HTTPS launcher and keeps `INSTALL_THIS_PC_RUNNER_ONLY.cmd` for backward compatibility.
+- Generated Direct HTTPS packages include `README_DIRECT_HTTPS_RUNNER.txt` and do not expose `INSTALL_COLLECTOR_SITE.cmd` as a top-level entry point.
 
 Safety:
 
@@ -385,7 +387,7 @@ Validation:
 - PowerShell parser check passed for `runner/scripts/install_direct_https_runner.ps1`.
 - `tests/powershell/Test-DirectHttpsInstaller.ps1` passed.
 - `Tests\Feature\SiteProfileValidationCommandTest` passed.
-- `Tests\Feature\DirectSiteKitAuditCommandTest` passed: 8 tests, 46 assertions.
+- `Tests\Feature\DirectSiteKitAuditCommandTest` passed and now checks the Direct HTTPS package UX files.
 - Full Laravel test suite passed after implementation: 253 tests, 1125 assertions.
 - Supermicro Direct HTTPS site-kit audit passed with acceptable `WARN`: `collectorName` is present but not required for Direct HTTPS active transport.
 - Direct HTTPS profile validation passed for `..\deployment\profiles\site_hq_direct_https.pilot.json`.
@@ -419,5 +421,5 @@ Live runner validation:
 7. Phase 18C Portal Setup Wizard MVP is done.
 8. Phase 18D Direct HTTPS Runner Installer MVP is done; continue normal scheduled-interval monitoring for Direct HTTPS runners.
 9. Phase 18E Collector-site Installer MVP is implemented and keeps Direct HTTPS behavior unaffected; Phase 18E.1 is done and confirms collector-share MVP requires Python on the managed collector host while small/no-IT sites should use Direct HTTPS mode.
-10. Plan Phase 18F Package UX Simplification and Mode-specific Installer Entry Points.
+10. Phase 18F Package UX Simplification and Mode-specific Installer Entry Points is implemented and tested.
 11. Later return to MariaDB migration runbook and rehearsal.

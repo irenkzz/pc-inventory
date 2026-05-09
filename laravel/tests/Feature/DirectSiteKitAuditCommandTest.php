@@ -54,6 +54,10 @@ class DirectSiteKitAuditCommandTest extends TestCase
         $this->assertStringContainsString('[OK] Direct HTTPS site kit found:', $output);
         $this->assertStringContainsString('[OK] Runner config found', $output);
         $this->assertStringContainsString('[OK] README found', $output);
+        $this->assertStringContainsString('[OK] README_DIRECT_HTTPS_RUNNER.txt found', $output);
+        $this->assertStringContainsString('[OK] INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd found', $output);
+        $this->assertStringContainsString('[OK] runner/scripts/install_direct_https_runner.ps1 found', $output);
+        $this->assertStringContainsString('[OK] Direct HTTPS package does not expose INSTALL_COLLECTOR_SITE.cmd top-level entry point', $output);
         $this->assertStringContainsString('[OK] transport_mode is direct_https', $output);
         $this->assertStringContainsString('[OK] serverBaseUrl is https://inventory-pilot.internal.lan', $output);
         $this->assertStringContainsString('[OK] serverBaseUrl uses HTTPS', $output);
@@ -61,6 +65,10 @@ class DirectSiteKitAuditCommandTest extends TestCase
         $this->assertStringContainsString('[OK] no stale HTTP endpoint detected', $output);
         $this->assertStringContainsString('[OK] no placeholder HTTPS endpoint detected', $output);
         $this->assertStringContainsString('[OK] Direct HTTPS active transport does not require collector-share fields', $output);
+        $this->assertStringContainsString('[OK] Direct HTTPS README contains Direct HTTPS wording', $output);
+        $this->assertStringContainsString('[OK] Direct HTTPS README contains small/no-IT wording', $output);
+        $this->assertStringContainsString('[OK] Direct HTTPS README contains HTTPS/certificate warning', $output);
+        $this->assertStringContainsString('[OK] Direct HTTPS README states Direct repair_update remains blocked', $output);
         $this->assertStringContainsString('[OK] no obvious rendered secret detected', $output);
         $this->assertStringContainsString('[OK] collector-share mode is not modified by this audit', $output);
         $this->assertStringContainsString('Result: PASS', $output);
@@ -247,6 +255,10 @@ class DirectSiteKitAuditCommandTest extends TestCase
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         File::put($artifact . DIRECTORY_SEPARATOR . 'README_SITE_KIT.md', $readme);
         File::put($artifact . DIRECTORY_SEPARATOR . 'READ_ME_FIRST_FOR_BRANCH.txt', 'Direct HTTPS pilot instructions.');
+        File::put($artifact . DIRECTORY_SEPARATOR . 'README_DIRECT_HTTPS_RUNNER.txt', "Direct HTTPS runner package.\nUse for a small/no-IT site.\nRequires an HTTPS endpoint and trusted certificate.\nDirect repair_update remains blocked for Direct HTTPS MVP.\n");
+        File::put($artifact . DIRECTORY_SEPARATOR . 'INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd', "@echo off\r\ncall \"%~dp0INSTALL_THIS_PC_RUNNER_ONLY.cmd\"\r\n");
+        File::ensureDirectoryExists($artifact . DIRECTORY_SEPARATOR . 'runner' . DIRECTORY_SEPARATOR . 'scripts');
+        File::put($artifact . DIRECTORY_SEPARATOR . 'runner' . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'install_direct_https_runner.ps1', "Write-Host 'Direct HTTPS installer'\r\n");
 
         return $artifact;
     }

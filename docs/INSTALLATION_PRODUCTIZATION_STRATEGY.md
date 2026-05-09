@@ -201,6 +201,10 @@ Generated collector-share site kits include the wrapper additively through the e
 
 Phase 18E.1 documents a productization dependency found during live collector validation. Status: implemented, tested, Supermicro package rebuilt, and validated with the expected clean missing-Python `FAIL` message. Collector-share MVP requires Python 3.x on the managed collector host. `collector/install_collector.ps1` now resolves `pythonw`, `python`, or the `py` launcher safely and fails clearly when no Python runtime is available, without the old `Source` property error. Python is not auto-installed or bundled in this MVP. Small/no-IT remote sites should use Direct HTTPS mode instead; future productization may bundle Python or package the collector as a self-contained executable/service.
 
+Phase 18F adds mode-specific top-level package entry points and READMEs without changing runner runtime, collector runtime, API contracts, command lifecycle, token handling, or Direct `repair_update`. Direct HTTPS packages now include `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd` and `README_DIRECT_HTTPS_RUNNER.txt` while keeping `INSTALL_THIS_PC_RUNNER_ONLY.cmd`. Collector-share packages now include `INSTALL_COLLECTOR_SITE.cmd` and `README_COLLECTOR_SITE.txt` while keeping existing collector launchers. The Direct HTTPS package does not expose `INSTALL_COLLECTOR_SITE.cmd`, and collector-share packages do not expose `INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd`.
+
+The new READMEs explain the deployment boundary: Direct HTTPS is for one PC / small no-IT / remote PCs without branch-share or collector, while collector-share is for HQ / branch / lab / multi-PC sites. Hybrid means the organization may use both modes across different sites; it does not mean mixing Direct HTTPS and collector-share inside one runner installation. Official packages/site kits remain generated only on Supermicro.
+
 ## 10. Built-in Preflight/Readiness Checks
 
 Future installer and wizard checks may reuse or align with existing operational commands:
@@ -272,7 +276,7 @@ Support summaries should use redacted labels, partial non-secret identifiers, ti
 - Phase 18D - Direct HTTPS Runner Installer MVP. Status: implemented, live-validated with manual Scheduled Task trigger, documented.
 - Phase 18E - Collector-site Installer MVP. Status: implemented, package-included, wrapper preflight validated, Python dependency handled cleanly.
 - Phase 18E.1 - Collector Python dependency handling. Status: done.
-- Phase 18F - Package UX Simplification and Mode-specific Installer Entry Points. Status: next candidate.
+- Phase 18F - Package UX Simplification and Mode-specific Installer Entry Points. Status: implemented and tested.
 - Then return to MariaDB migration runbook and rehearsal.
 
 The roadmap intentionally keeps setup productization separate from production database migration and cutover approval.
