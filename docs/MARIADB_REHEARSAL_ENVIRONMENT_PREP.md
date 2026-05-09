@@ -54,6 +54,8 @@ Phase 19E completed the verified SQLite source and evidence copy into the rehear
 
 Phase 19F MariaDB/MySQL rehearsal database setup is documented in `docs/MARIADB_REHEARSAL_DB_SETUP.md`. It approves only controlled MariaDB service and empty rehearsal database preparation on Supermicro: MariaDB `10.11` LTS preference, empty `inventory_rehearsal` and `inventory_rehearsal_restore` databases, scoped `inventory_rehearsal_app` user, service/empty DB/app-user isolation validation, and non-secret notes. It does not approve migrations, app data transfer, real rehearsal `.env`, live config changes, package generation, web exposure, runner/collector traffic changes, or cutover.
 
+Phase 19F Supermicro runtime validation is complete: MariaDB `10.11.16-MariaDB` service is running, `127.0.0.1:3306` is reachable, `inventory_rehearsal` and `inventory_rehearsal_restore` exist and are empty, `inventory_rehearsal_app` exists with grants scoped only to those rehearsal databases, and negative access to unrelated/system DBs failed as expected. No credentials or secrets were printed or recorded.
+
 ## 3. Recommended rehearsal environment layout
 
 Recommended layout: same Supermicro host with a separate Laravel copy/path.

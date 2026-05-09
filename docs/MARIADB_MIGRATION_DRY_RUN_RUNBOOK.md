@@ -409,6 +409,8 @@ Phase 19E completed the verified SQLite rehearsal source copy and evidence copy 
 
 Phase 19F MariaDB/MySQL rehearsal database setup is documented in `docs/MARIADB_REHEARSAL_DB_SETUP.md`. It prepares only the empty MariaDB/MySQL rehearsal database foundation on Supermicro and remains pre-migration: no Laravel migrations, app data transfer, SQLite-to-MySQL conversion, real rehearsal `.env`, live config changes, web exposure, package generation, runner/collector traffic changes, or cutover approval.
 
+Phase 19F Supermicro runtime validation is complete: MariaDB `10.11.16-MariaDB` is running on reachable localhost port `3306`, both rehearsal schemas exist and are empty, `inventory_rehearsal_app` is scoped only to rehearsal schemas, and negative access testing failed as expected for unrelated/system DB access. No migrations, app data transfer, real rehearsal `.env`, live config changes, package generation, runner/collector traffic changes, or secret exposure occurred.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:

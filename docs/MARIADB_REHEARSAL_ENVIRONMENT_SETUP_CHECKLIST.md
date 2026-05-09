@@ -277,6 +277,8 @@ Phase 19F uses Option B: controlled MariaDB service and empty rehearsal database
 
 Phase 19F still does not approve Laravel migrations, app data transfer, SQLite-to-MySQL conversion, real rehearsal `.env`, live `.env`/`APP_URL`/DB driver changes, web endpoint exposure, package/site-kit generation, runner/collector traffic changes, production data mutation, or cutover.
 
+Phase 19F Supermicro runtime validation is complete. MariaDB service is `Running`, localhost port `3306` is reachable, version is `10.11.16-MariaDB`, `inventory_rehearsal` and `inventory_rehearsal_restore` exist and are empty, `inventory_rehearsal_app` exists with grants scoped only to those rehearsal databases, and negative access to unrelated/system DBs failed as expected. Real rehearsal `.env` still does not exist, copied SQLite source remains read-only, and no migrations, data transfer, package generation, web serving, proxy/DNS changes, runner/collector traffic changes, live config changes, production data mutation, or secret exposure occurred.
+
 Placeholder example:
 
 ```env
