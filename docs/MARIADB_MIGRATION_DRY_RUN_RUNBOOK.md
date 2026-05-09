@@ -407,6 +407,8 @@ Phase 19D Supermicro validation completed with expected `WARN`: dry-run reported
 
 Phase 19E completed the verified SQLite rehearsal source copy and evidence copy with expected `WARN`. The rehearsal SQLite source is now `D:\inventory-rehearsal\source-copy\database.sqlite`, read-only, `5,910,528` bytes, and integrity-checked as `ok` via PHP/PDO against the copied DB only. Raw archive and downloads/site kits were copied to the rehearsal filesystem without migration, DB install, DB/user creation, data transfer, package generation, live config change, runner/collector traffic change, production data mutation, or secret exposure.
 
+Phase 19F MariaDB/MySQL rehearsal database setup is documented in `docs/MARIADB_REHEARSAL_DB_SETUP.md`. It prepares only the empty MariaDB/MySQL rehearsal database foundation on Supermicro and remains pre-migration: no Laravel migrations, app data transfer, SQLite-to-MySQL conversion, real rehearsal `.env`, live config changes, web exposure, package generation, runner/collector traffic changes, or cutover approval.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:
