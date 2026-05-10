@@ -829,12 +829,17 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
     public function test_execute_rolls_back_on_validation_failure(): void
     {
         $fixture = $this->makeReadinessFixture();
-        Config::set('inventory.mariadb_rehearsal.force_execute_validation_failure', 'row_count');
+        Config::set('inventory.mariadb_rehearsal.force_execute_validation_failure', 'count');
 
         [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
 
         $this->assertSame(1, $exitCode);
         $this->assertStringContainsString('transaction_rolled_back=yes', $output);
+        $this->assertStringContainsString('execute_result=FAIL', $output);
+        $this->assertStringContainsString('failed_import_table=none', $output);
+        $this->assertStringContainsString('failed_stage=count_validation', $output);
+        $this->assertStringContainsString('rollback_reason_code=count_validation_failed', $output);
+        $this->assertStringContainsString('transaction_committed=no', $output);
         $this->assertStringContainsString('Phase 19M execute import rolled back before commit.', $output);
         foreach ($this->approvedImportTables() as $table) {
             $this->assertSame(0, DB::table($table)->count(), $table);
@@ -850,7 +855,100 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertSame(1, $exitCode);
         $this->assertStringContainsString('json_text_validation=FAIL', $output);
         $this->assertStringContainsString('transaction_rolled_back=yes', $output);
+        $this->assertStringContainsString('failed_stage=json_validation', $output);
+        $this->assertStringContainsString('rollback_reason_code=invalid_json', $output);
         $this->assertSame(0, DB::table('raw_files')->count());
+    }
+
+    public function test_execute_diagnostics_for_first_table_insert_failure_are_redacted(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Config::set('inventory.mariadb_rehearsal.force_execute_insert_failure_table', 'users');
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'users', 'insert_rows', 'insert_failed');
+        $this->assertNoPartialImportedRows();
+        $this->assertRedactedExecuteFailureOutput($output, $fixture);
+    }
+
+    public function test_execute_diagnostics_for_collector_sites_failure_after_users_are_redacted(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Config::set('inventory.mariadb_rehearsal.force_execute_insert_failure_table', 'collector_sites');
+        Config::set('inventory.mariadb_rehearsal.force_execute_insert_failure_reason', 'duplicate_key');
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('import_table=users source_count=1 target_count=1', $output);
+        $this->assertRollbackDiagnostics($output, 'collector_sites', 'insert_rows', 'duplicate_key');
+        $this->assertSame(0, DB::table('users')->count());
+        $this->assertNoPartialImportedRows();
+        $this->assertRedactedExecuteFailureOutput($output, $fixture);
+    }
+
+    public function test_execute_foreign_key_insert_failure_reason_is_safe(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Config::set('inventory.mariadb_rehearsal.force_execute_insert_failure_table', 'devices');
+        Config::set('inventory.mariadb_rehearsal.force_execute_insert_failure_reason', 'foreign_key_violation');
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'devices', 'insert_rows', 'foreign_key_violation');
+        $this->assertNoPartialImportedRows();
+    }
+
+    public function test_execute_schema_mapping_failure_after_users_is_classified(): void
+    {
+        $fixture = $this->makeReadinessFixture(sourceCollectorSiteIdColumn: false);
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'collector_sites', 'schema_map', 'schema_mapping_failed');
+        $this->assertNoPartialImportedRows();
+    }
+
+    public function test_execute_not_null_violation_is_classified_without_values(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Schema::table('collector_sites', function ($blueprint): void {
+            $blueprint->string('required_name');
+        });
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'collector_sites', 'insert_rows', 'not_null_violation');
+        $this->assertRedactedExecuteFailureOutput($output, $fixture);
+    }
+
+    public function test_execute_relationship_validation_failure_rolls_back_with_reason(): void
+    {
+        $fixture = $this->makeReadinessFixture(invalidCollectorSiteLink: true);
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'none', 'relationship_validation', 'relationship_validation_failed');
+        $this->assertNoPartialImportedRows();
+    }
+
+    public function test_execute_unexpected_exception_is_classified_without_message(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Config::set('inventory.mariadb_rehearsal.force_execute_validation_failure', 'unexpected');
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'none', 'post_commit_validation', 'unexpected_exception');
+        $this->assertStringNotContainsString('forced unexpected validation failure', $output);
+        $this->assertNoPartialImportedRows();
     }
 
     private function setRehearsalBoundaryConfig(): void
@@ -875,6 +973,8 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         string $rawMetadataJson = '{}',
         bool $sourceSiteTokens = false,
         bool $targetSiteTokens = false,
+        bool $sourceCollectorSiteIdColumn = true,
+        bool $invalidCollectorSiteLink = false,
     ): array {
         $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phase19l_' . bin2hex(random_bytes(6));
         $source = $root . DIRECTORY_SEPARATOR . 'source-copy' . DIRECTORY_SEPARATOR . 'database.sqlite';
@@ -916,13 +1016,13 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         DB::purge('mysql');
         DB::reconnect('mysql');
 
-        $this->createSourceSqlite($source, $classificationSourceRows, $rawHash, $rawSavedPath, $rawMetadataJson, $sourceSiteTokens);
+        $this->createSourceSqlite($source, $classificationSourceRows, $rawHash, $rawSavedPath, $rawMetadataJson, $sourceSiteTokens, $sourceCollectorSiteIdColumn, $invalidCollectorSiteLink);
         $this->createTargetSchema($classificationTargetRows, $classificationTargetSuffix, $targetSiteTokens);
 
         return compact('root', 'source', 'rawArchive', 'downloads', 'dumpDir', 'dump');
     }
 
-    private function createSourceSqlite(string $source, int $classificationRows, ?string $rawHash, string $rawSavedPath, string $rawMetadataJson, bool $sourceSiteTokens): void
+    private function createSourceSqlite(string $source, int $classificationRows, ?string $rawHash, string $rawSavedPath, string $rawMetadataJson, bool $sourceSiteTokens, bool $sourceCollectorSiteIdColumn, bool $invalidCollectorSiteLink): void
     {
         $pdo = new PDO('sqlite:' . $source);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -978,10 +1078,17 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $pdo->exec('ALTER TABLE runner_commands ADD COLUMN acknowledged_at TEXT');
         $pdo->exec('ALTER TABLE runner_commands ADD COLUMN result_upload_id INTEGER');
         $pdo->exec('ALTER TABLE runner_commands ADD COLUMN payload_json TEXT');
-        $pdo->exec('ALTER TABLE collector_sites ADD COLUMN site_id TEXT');
+        if ($sourceCollectorSiteIdColumn) {
+            $pdo->exec('ALTER TABLE collector_sites ADD COLUMN site_id TEXT');
+        }
 
         $pdo->exec("INSERT INTO users (id) VALUES (1)");
-        $pdo->exec("INSERT INTO collector_sites (id, site_id) VALUES (1, 'SITE-HQ')");
+        $collectorSite = $invalidCollectorSiteLink ? 'SITE-OTHER' : 'SITE-HQ';
+        if ($sourceCollectorSiteIdColumn) {
+            $pdo->exec("INSERT INTO collector_sites (id, site_id) VALUES (1, '{$collectorSite}')");
+        } else {
+            $pdo->exec('INSERT INTO collector_sites (id) VALUES (1)');
+        }
         $pdo->exec("INSERT INTO devices (id) VALUES (1)");
         $pdo->exec("INSERT INTO device_identities (id, device_id) VALUES (1, 1)");
         $pdo->exec("INSERT INTO device_scans (id, device_id) VALUES (1, 1)");
@@ -1015,7 +1122,6 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         foreach ([
             'migrations',
             'users',
-            'collector_sites',
             'devices',
             'device_identities',
             'device_scans',
@@ -1040,6 +1146,12 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
                 $blueprint->integer('id')->primary();
             });
         }
+
+        Schema::create('collector_sites', function ($blueprint): void {
+            $blueprint->string('site_id')->primary();
+            $blueprint->string('site_name')->nullable();
+            $blueprint->text('description')->nullable();
+        });
 
         Schema::table('device_identities', function ($blueprint): void {
             $blueprint->integer('device_id')->nullable();
@@ -1097,10 +1209,6 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
             $blueprint->integer('result_upload_id')->nullable();
             $blueprint->text('payload_json')->nullable();
         });
-        Schema::table('collector_sites', function ($blueprint): void {
-            $blueprint->string('site_id')->nullable();
-        });
-
         Schema::create('classification_rules', function ($blueprint): void {
             $blueprint->integer('id')->primary();
             $blueprint->string('key')->nullable();
@@ -1158,6 +1266,54 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         return (string) $pdo->query('SELECT saved_path FROM raw_files WHERE id = 1')->fetchColumn();
+    }
+
+    private function assertRollbackDiagnostics(string $output, string $table, string $stage, string $reason): void
+    {
+        $this->assertStringContainsString('execute_result=FAIL', $output);
+        $this->assertStringContainsString('first_failure_detected=yes', $output);
+        $this->assertStringContainsString('transaction_started=yes', $output);
+        $this->assertStringContainsString('transaction_committed=no', $output);
+        $this->assertStringContainsString('transaction_rolled_back=yes', $output);
+        $this->assertStringContainsString("failed_import_table={$table}", $output);
+        $this->assertStringContainsString("failed_stage={$stage}", $output);
+        $this->assertStringContainsString("rollback_reason_code={$reason}", $output);
+        $this->assertMatchesRegularExpression('/exception_class=(redacted|none|[A-Za-z0-9_\\\\]+)/', $output);
+        $this->assertMatchesRegularExpression('/sqlstate=(redacted|none|[A-Z0-9]{5})/', $output);
+        $this->assertMatchesRegularExpression('/sql_error_category=(none|not_sql|[a-z_]+)/', $output);
+        $this->assertStringContainsString('sql_message_printed=no', $output);
+        $this->assertStringContainsString('sql_query_printed=no', $output);
+        $this->assertStringContainsString('bindings_printed=no', $output);
+        $this->assertStringContainsString('row_values_printed=no', $output);
+        $this->assertStringContainsString('raw_contents_printed=no', $output);
+        $this->assertStringContainsString('secrets_printed=no', $output);
+        $this->assertStringContainsString('target_empty_state_after_failure=PASS', $output);
+        $this->assertStringContainsString('writes_performed=no', $output);
+    }
+
+    private function assertNoPartialImportedRows(): void
+    {
+        foreach ($this->approvedImportTables() as $table) {
+            $this->assertSame(0, DB::table($table)->count(), $table);
+        }
+        $this->assertSame(18, DB::table('migrations')->count());
+        $this->assertSame(8, DB::table('classification_rules')->count());
+    }
+
+    private function assertRedactedExecuteFailureOutput(string $output, array $fixture): void
+    {
+        $this->assertStringNotContainsString('select ', strtolower($output));
+        $this->assertStringNotContainsString('insert into', strtolower($output));
+        $this->assertStringNotContainsString('bindings', strtolower(str_replace('bindings_printed=no', '', $output)));
+        $this->assertStringNotContainsString('SITE-HQ', $output);
+        $this->assertStringNotContainsString('RUNNER-ONE', $output);
+        $this->assertStringNotContainsString('evidence-one.csv', $output);
+        $this->assertStringNotContainsString($fixture['rawArchive'], $output);
+        $this->assertStringNotContainsString('redacted-a', $output);
+        $this->assertStringNotContainsString('redacted-b', $output);
+        $this->assertStringNotContainsString('payload_json":"', $output);
+        $this->assertStringNotContainsString('token_hash', $output);
+        $this->assertStringNotContainsString('fake-db-password-secret-value', $output);
     }
 
     /** @return list<string> */

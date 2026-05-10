@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +61,22 @@ class MariaDbRehearsalTransfer extends Command
     private bool $rawHashWarningPresent = false;
 
     private string $rawEvidenceMappingReadiness = 'not_run';
+
+    private bool $transactionStarted = false;
+
+    private bool $transactionCommitted = false;
+
+    private string $failedImportTable = 'none';
+
+    private string $failedStage = 'none';
+
+    private string $rollbackReasonCode = 'none';
+
+    private string $exceptionClass = 'none';
+
+    private string $sqlState = 'none';
+
+    private string $sqlErrorCategory = 'none';
 
     /** @var list<string> */
     private array $requiredTables = [
@@ -199,6 +216,14 @@ class MariaDbRehearsalTransfer extends Command
         $this->writesPerformed = false;
         $this->rawHashWarningPresent = false;
         $this->rawEvidenceMappingReadiness = 'not_run';
+        $this->transactionStarted = false;
+        $this->transactionCommitted = false;
+        $this->failedImportTable = 'none';
+        $this->failedStage = 'none';
+        $this->rollbackReasonCode = 'none';
+        $this->exceptionClass = 'none';
+        $this->sqlState = 'none';
+        $this->sqlErrorCategory = 'none';
     }
 
     private function commandMode(): string
@@ -755,6 +780,7 @@ class MariaDbRehearsalTransfer extends Command
 
         try {
             DB::transaction(function (): void {
+                $this->transactionStarted = true;
                 foreach ($this->executeImportTables as $table) {
                     $this->insertApprovedTable($table);
                 }
@@ -763,14 +789,27 @@ class MariaDbRehearsalTransfer extends Command
 
                 $forced = (string) config('inventory.mariadb_rehearsal.force_execute_validation_failure', '');
                 if ($forced !== '') {
+                    $reason = $this->safeRollbackReasonCode($forced . '_validation_failed');
+                    $stage = match ($forced) {
+                        'count' => 'count_validation',
+                        'primary_key' => 'pk_validation',
+                        'relationship' => 'relationship_validation',
+                        'json' => 'json_validation',
+                        default => 'post_commit_validation',
+                    };
+                    $this->markExecuteFailure($stage, 'none', $reason === 'unexpected_exception' ? 'unexpected_exception' : $reason);
                     throw new \RuntimeException("forced {$forced} validation failure");
                 }
             });
+            $this->transactionCommitted = true;
             $this->writesPerformed = true;
             $this->infoLine('writes_performed=yes');
         } catch (Throwable $e) {
+            if ($this->rollbackReasonCode === 'none') {
+                $this->markExecuteFailure($this->failedStage === 'none' ? 'insert_rows' : $this->failedStage, $this->failedImportTable, $this->safeReasonCodeFromThrowable($e), $e);
+            }
             $this->infoLine('writes_performed=no');
-            $this->infoLine('transaction_rolled_back=yes');
+            $this->executeFailureDiagnostics();
             $this->fail('Phase 19M execute import rolled back before commit.');
             return;
         }
@@ -794,23 +833,42 @@ class MariaDbRehearsalTransfer extends Command
 
     private function insertApprovedTable(string $table): void
     {
+        $this->failedImportTable = $table;
+        $this->failedStage = 'schema_map';
         if (! $this->sourceHasTable($table) || ! Schema::hasTable($table)) {
-            throw new \RuntimeException("missing approved import table {$table}");
+            $this->markExecuteFailure('schema_map', $table, ! $this->sourceHasTable($table) ? 'source_table_missing' : 'target_table_missing');
+            throw new \RuntimeException('approved import table unavailable');
         }
 
         $targetColumns = Schema::getColumnListing($table);
         $columns = array_values(array_intersect($targetColumns, $this->sourceColumns[$table] ?? []));
-        if (! in_array('id', $columns, true)) {
-            throw new \RuntimeException("id column missing for {$table}");
+        foreach ($this->primaryKeyColumnsFor($table) as $primaryKeyColumn) {
+            if (! in_array($primaryKeyColumn, $columns, true)) {
+                $this->markExecuteFailure('schema_map', $table, 'schema_mapping_failed');
+                throw new \RuntimeException('primary key column unavailable for import');
+            }
         }
 
+        $this->failedStage = 'read_source';
         $columnSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $columns));
         $rows = $this->sourceRows('SELECT ' . $columnSql . ' FROM ' . $this->quoteIdentifier($table) . ' ORDER BY id');
 
-        foreach (array_chunk($rows, 100) as $chunk) {
-            if ($chunk !== []) {
-                DB::table($table)->insert($chunk);
+        $this->failedStage = 'insert_rows';
+        try {
+            $forcedInsertFailureTable = (string) config('inventory.mariadb_rehearsal.force_execute_insert_failure_table', '');
+            if ($forcedInsertFailureTable === $table) {
+                $reason = $this->safeRollbackReasonCode((string) config('inventory.mariadb_rehearsal.force_execute_insert_failure_reason', 'insert_failed'));
+                $this->markExecuteFailure('insert_rows', $table, $reason, new \RuntimeException('forced redacted insert failure'));
+                throw new \RuntimeException('forced redacted insert failure');
             }
+            foreach (array_chunk($rows, 100) as $chunk) {
+                if ($chunk !== []) {
+                    DB::table($table)->insert($chunk);
+                }
+            }
+        } catch (Throwable $e) {
+            $this->markExecuteFailure('insert_rows', $table, $this->safeReasonCodeFromThrowable($e), $e);
+            throw $e;
         }
 
         $this->infoLine("import_table={$table} source_count={$this->sourceCount($table)} target_count={$this->targetCount($table)}");
@@ -843,6 +901,7 @@ class MariaDbRehearsalTransfer extends Command
             && $rawEvidencePass;
 
         if ($inTransaction && ! $pass) {
+            $this->markExecuteFailure($this->validationFailureStage($rowCountsPass, $primaryKeyPass, $relationshipPass, $jsonPass), 'none', $this->validationFailureReasonCode($rowCountsPass, $primaryKeyPass, $relationshipPass, $jsonPass));
             throw new \RuntimeException('in-transaction validation failed');
         }
 
@@ -867,7 +926,7 @@ class MariaDbRehearsalTransfer extends Command
     private function primaryKeysPreserved(): bool
     {
         foreach ($this->executeImportTables as $table) {
-            if ($this->sourceIdList($table) !== $this->targetIdList($table)) {
+            if ($this->sourcePrimaryKeyList($table) !== $this->targetPrimaryKeyList($table)) {
                 return false;
             }
         }
@@ -875,17 +934,75 @@ class MariaDbRehearsalTransfer extends Command
         return true;
     }
 
-    /** @return list<int> */
-    private function sourceIdList(string $table): array
+    /** @return list<string> */
+    private function sourcePrimaryKeyList(string $table): array
     {
-        return array_map('intval', array_column($this->sourceRows('SELECT id FROM ' . $this->quoteIdentifier($table) . ' ORDER BY id'), 'id'));
+        $columns = $this->primaryKeyColumnsFor($table);
+        $columnSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $columns));
+        $orderSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $columns));
+
+        return array_map(
+            fn (array $row): string => implode(':', array_map(fn (string $column): string => (string) ($row[$column] ?? ''), $columns)),
+            $this->sourceRows('SELECT ' . $columnSql . ' FROM ' . $this->quoteIdentifier($table) . ' ORDER BY ' . $orderSql)
+        );
     }
 
-    /** @return list<int> */
-    private function targetIdList(string $table): array
+    /** @return list<string> */
+    private function primaryKeyColumnsFor(string $table): array
+    {
+        return $table === 'collector_sites' ? ['site_id'] : ['id'];
+    }
+
+    private function validationFailureStage(bool $rowCountsPass, bool $primaryKeyPass, bool $relationshipPass, bool $jsonPass): string
+    {
+        if (! $rowCountsPass) {
+            return 'count_validation';
+        }
+        if (! $primaryKeyPass) {
+            return 'pk_validation';
+        }
+        if (! $relationshipPass) {
+            return 'relationship_validation';
+        }
+        if (! $jsonPass) {
+            return 'json_validation';
+        }
+
+        return 'post_commit_validation';
+    }
+
+    private function validationFailureReasonCode(bool $rowCountsPass, bool $primaryKeyPass, bool $relationshipPass, bool $jsonPass): string
+    {
+        if (! $rowCountsPass) {
+            return 'count_validation_failed';
+        }
+        if (! $primaryKeyPass) {
+            return 'primary_key_validation_failed';
+        }
+        if (! $relationshipPass) {
+            return 'relationship_validation_failed';
+        }
+        if (! $jsonPass) {
+            return 'invalid_json';
+        }
+
+        return 'unexpected_exception';
+    }
+
+    /** @return list<string> */
+    private function targetPrimaryKeyList(string $table): array
     {
         try {
-            return array_map(fn (object $row): int => (int) $row->id, DB::table($table)->select('id')->orderBy('id')->get()->all());
+            $columns = $this->primaryKeyColumnsFor($table);
+            $query = DB::table($table)->select($columns);
+            foreach ($columns as $column) {
+                $query->orderBy($column);
+            }
+
+            return array_map(
+                fn (object $row): string => implode(':', array_map(fn (string $column): string => (string) ($row->{$column} ?? ''), $columns)),
+                $query->get()->all()
+            );
         } catch (Throwable) {
             return [];
         }
@@ -1011,6 +1128,10 @@ class MariaDbRehearsalTransfer extends Command
 
         $pass = true;
         foreach ($this->executeImportTables as $table) {
+            if (! $this->targetHasColumns($table, ['id'])) {
+                $this->infoLine("auto_increment_table={$table} status=no_id_column_skipped");
+                continue;
+            }
             $maxId = (int) DB::table($table)->max('id');
             if ($maxId <= 0) {
                 $this->infoLine("auto_increment_table={$table} status=no_rows");
@@ -1077,6 +1198,157 @@ class MariaDbRehearsalTransfer extends Command
         } catch (Throwable) {
             return false;
         }
+    }
+
+    private function markExecuteFailure(string $stage, string $table, string $reasonCode, ?Throwable $throwable = null): void
+    {
+        $this->failedStage = $stage;
+        $this->failedImportTable = in_array($table, $this->executeImportTables, true) ? $table : 'none';
+        $this->rollbackReasonCode = $this->safeRollbackReasonCode($reasonCode);
+        if ($throwable !== null) {
+            $this->exceptionClass = $this->safeExceptionClass($throwable);
+            $this->sqlState = $this->safeSqlState($throwable);
+            $this->sqlErrorCategory = $this->safeSqlErrorCategory($throwable);
+        }
+    }
+
+    private function executeFailureDiagnostics(): void
+    {
+        $this->infoLine('execute_result=FAIL');
+        $this->infoLine('first_failure_detected=yes');
+        $this->infoLine('transaction_started=' . ($this->transactionStarted ? 'yes' : 'no'));
+        $this->infoLine('transaction_committed=' . ($this->transactionCommitted ? 'yes' : 'no'));
+        $this->infoLine('transaction_rolled_back=' . ($this->transactionStarted && ! $this->transactionCommitted ? 'yes' : 'no'));
+        $this->infoLine("failed_import_table={$this->failedImportTable}");
+        $this->infoLine("failed_stage={$this->failedStage}");
+        $this->infoLine("rollback_reason_code={$this->rollbackReasonCode}");
+        $this->infoLine("exception_class={$this->exceptionClass}");
+        $this->infoLine("sqlstate={$this->sqlState}");
+        $this->infoLine("sql_error_category={$this->sqlErrorCategory}");
+        $this->infoLine('sql_message_printed=no');
+        $this->infoLine('sql_query_printed=no');
+        $this->infoLine('bindings_printed=no');
+        $this->infoLine('row_values_printed=no');
+        $this->infoLine('raw_contents_printed=no');
+        $this->infoLine('secrets_printed=no');
+        $this->infoLine('target_empty_state_after_failure=' . ($this->targetImportedTablesEmpty() ? 'PASS' : 'FAIL'));
+    }
+
+    private function targetImportedTablesEmpty(): bool
+    {
+        foreach ($this->executeImportTables as $table) {
+            if ($this->targetCount($table) > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function safeReasonCodeFromThrowable(Throwable $throwable): string
+    {
+        if ($throwable instanceof QueryException) {
+            $message = strtolower($throwable->getMessage());
+            if (str_contains($message, 'not null')) {
+                return 'not_null_violation';
+            }
+            if (str_contains($message, 'foreign key')) {
+                return 'foreign_key_violation';
+            }
+            if (str_contains($message, 'unique') || str_contains($message, 'duplicate')) {
+                return 'duplicate_key';
+            }
+            if (str_contains($message, 'too long') || str_contains($message, 'data too long')) {
+                return 'data_too_long';
+            }
+            if (str_contains($message, 'datetime') || str_contains($message, 'date time')) {
+                return 'invalid_datetime';
+            }
+            $driverCode = $this->sqlDriverErrorCode($throwable);
+            return match ($driverCode) {
+                1062, 19 => 'duplicate_key',
+                1048, 1299 => 'not_null_violation',
+                1451, 1452, 787 => 'foreign_key_violation',
+                1406 => 'data_too_long',
+                1292 => 'invalid_datetime',
+                default => $this->safeSqlState($throwable) === '22001' ? 'data_too_long' : 'insert_failed',
+            };
+        }
+
+        return $this->rollbackReasonCode !== 'none' ? $this->rollbackReasonCode : 'unexpected_exception';
+    }
+
+    private function sqlDriverErrorCode(Throwable $throwable): ?int
+    {
+        if (! $throwable instanceof QueryException) {
+            return null;
+        }
+
+        $info = $throwable->errorInfo;
+        return isset($info[1]) && is_numeric($info[1]) ? (int) $info[1] : null;
+    }
+
+    private function safeRollbackReasonCode(string $reasonCode): string
+    {
+        $allowed = [
+            'prewrite_gate_failed',
+            'source_table_missing',
+            'target_table_missing',
+            'schema_mapping_failed',
+            'source_read_failed',
+            'row_transform_failed',
+            'insert_failed',
+            'duplicate_key',
+            'not_null_violation',
+            'foreign_key_violation',
+            'data_too_long',
+            'invalid_datetime',
+            'invalid_json',
+            'count_validation_failed',
+            'primary_key_validation_failed',
+            'relationship_validation_failed',
+            'auto_increment_validation_failed',
+            'unexpected_exception',
+            'redaction_guard_failed',
+        ];
+
+        return in_array($reasonCode, $allowed, true) ? $reasonCode : 'unexpected_exception';
+    }
+
+    private function safeExceptionClass(Throwable $throwable): string
+    {
+        $class = class_basename($throwable::class);
+
+        return preg_match('/^[A-Za-z0-9_\\\\]+$/', $class) === 1 ? $class : 'redacted';
+    }
+
+    private function safeSqlState(Throwable $throwable): string
+    {
+        $state = '';
+        if ($throwable instanceof QueryException && isset($throwable->errorInfo[0])) {
+            $state = (string) $throwable->errorInfo[0];
+        }
+        if ($state === '') {
+            $state = (string) $throwable->getCode();
+        }
+
+        return preg_match('/^[A-Z0-9]{5}$/', $state) === 1 ? $state : 'redacted';
+    }
+
+    private function safeSqlErrorCategory(Throwable $throwable): string
+    {
+        if (! $throwable instanceof QueryException) {
+            return 'not_sql';
+        }
+
+        return match ($this->safeReasonCodeFromThrowable($throwable)) {
+            'duplicate_key' => 'constraint_duplicate',
+            'not_null_violation' => 'constraint_not_null',
+            'foreign_key_violation' => 'constraint_foreign_key',
+            'data_too_long' => 'data_length',
+            'invalid_datetime' => 'data_datetime',
+            default => 'sql_insert',
+        };
     }
 
     private function schemaDifferencePolicySection(): void

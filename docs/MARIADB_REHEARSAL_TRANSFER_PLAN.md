@@ -717,3 +717,9 @@ Phase 19M adds the first controlled `--execute` mode to the existing `php artisa
 Execute scope is limited to importing the approved application/domain tables into an empty `inventory_rehearsal` target. It preserves primary keys and source values, preserves `migrations`, keeps `classification_rules` compare-only and target-preserved, preserves `raw_files.saved_path`, skips framework/transient/security tables, and runs post-import count/PK/relationship/JSON/command/raw-evidence/auto-increment validation.
 
 Phase 19M does not reset/truncate tables, create dumps, restore dumps, write to `inventory_rehearsal_restore`, read or mutate live SQLite, change live config, expose web endpoints, generate packages/site kits, change runner/collector traffic, enable Direct `repair_update`, approve production migration, or approve cutover.
+
+## 33. Phase 19M.1 rollback diagnostics
+
+Phase 19M.1 adds redacted execute rollback diagnostics before a second execute attempt. Failed execute output identifies only safe fields such as failed stage, failed approved import table, rollback reason code, exception class, and SQLSTATE/category when safe. It explicitly reports that SQL messages, SQL text, bindings, row values, raw contents, and secrets are not printed.
+
+Phase 19M.1 also fixes the first execute import-loop issue after `users`: real migrated `collector_sites` uses `site_id` as its primary key and has no `id` column, so import primary-key preservation and auto-increment checks are table-aware. Rollback-on-first-failure remains unchanged, and no reset/truncate cleanup is added.
