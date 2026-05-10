@@ -747,3 +747,29 @@ Phase 19N evidence review was accepted as `PASS_WITH_WARN`. The accepted warning
 Phase 19O restore rehearsal design is documented in `docs/MARIADB_REHEARSAL_RESTORE_REHEARSAL_DESIGN.md`. It defines a future restore rehearsal from `inventory_rehearsal` into `inventory_rehearsal_restore`, with pre-restore checks, safe dump evidence, restore target boundaries, count-only validation, known warnings, stop conditions, and acceptance criteria.
 
 Phase 19O is design-only. Restore execution remains unapproved until a separate explicit Phase 19O execution step or Phase 19O.1. Production migration and cutover remain blocked.
+
+## 37. Phase 19P restore rehearsal evidence review
+
+Phase 19O.1 controlled restore rehearsal evidence is documented in `docs/MARIADB_REHEARSAL_RESTORE_REHEARSAL_RESULT.md` and accepted as `PASS_WITH_WARN`.
+
+Count-only result:
+
+```text
+phase=19O.1_restore_rehearsal
+result=PASS_WITH_WARN
+restore_source_database=inventory_rehearsal
+restore_target_database=inventory_rehearsal_restore
+restore_target_pre_restore_empty=yes
+dump_created=yes
+dump_file_nonzero=yes
+restore_completed=yes
+restore_into_inventory_rehearsal=no
+restore_into_live_db=no
+restore_count_validation=PASS
+relationship_validation=PASS
+relationship_orphan_count=0
+restore_raw_evidence_validation=PASS_WITH_WARN
+raw_hash_semantics=file_content_hash_unverified
+```
+
+The accepted warning remains unverified `raw_hash` semantics. Phase 19P does not approve production migration, cutover, live DB switching, live `.env` changes, web exposure, runner/collector repointing, package/site-kit generation, or Direct `repair_update`.
