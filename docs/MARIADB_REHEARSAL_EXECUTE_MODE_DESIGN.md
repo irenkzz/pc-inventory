@@ -195,10 +195,12 @@ Policy:
 - Do not persist `D:\inventory-rehearsal` resolved paths into production-style authoritative data.
 - Basename-only matching is acceptable only when archive basenames are globally unique for the checked archive.
 - Prefer suffix-based matching over pure basename when stored path shape supports it.
-- If duplicate basename candidates exist, use suffix uniqueness and `raw_hash` if available.
+- If duplicate basename candidates exist, use suffix uniqueness. `raw_hash` must not be used to disambiguate unless its semantics are explicitly proven.
 - If ambiguity remains, fail closed.
 - If a copied archive file is missing after mapping, fail closed unless later manual evidence exception is approved.
-- If `raw_hash` is available, use it as a stronger validation signal:
+- Treat `raw_hash` as semantically unverified by default. A 64-character value alone is not proof of file-content SHA-256.
+- If `raw_hash` semantics are unverified and path mapping resolves completely, raw evidence mapping readiness is `PASS_WITH_WARN`, not `FAIL`.
+- If `raw_hash` is explicitly proven/configured as file-content SHA-256, use it as a stronger validation signal:
   - candidate exists
   - candidate hash matches source `raw_hash`
   - output hash-checked and hash-mismatch counts only
@@ -214,8 +216,14 @@ Output counts only:
 - `suffix_resolved_count`
 - `ambiguous_count`
 - `unresolved_count`
+- `raw_hash_populated_count`
+- `raw_hash_length_64_count`
+- `raw_hash_semantics`
+- `hash_validation_available`
 - `hash_checked_count`
 - `hash_mismatch_count`
+- `hash_algorithm_detected`
+- `raw_hash_semantic_warning`
 
 Future production transfer principle:
 
