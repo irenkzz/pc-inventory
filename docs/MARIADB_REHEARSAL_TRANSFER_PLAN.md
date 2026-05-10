@@ -709,3 +709,11 @@ The readiness mode validates Phase 19K gates without writing data: explicit sour
 It still has no `--execute` mode and does not transfer data, reset/truncate tables, create dumps, restore dumps, write to `inventory_rehearsal_restore`, expose a web endpoint, generate packages/site kits, change live config, read/mutate live SQLite, or change runner/collector traffic.
 
 Phase 19M remains the earliest possible future execute-import phase and requires separate approval.
+
+## 32. Phase 19M controlled execute import
+
+Phase 19M adds the first controlled `--execute` mode to the existing `php artisan inventory:mariadb-rehearsal-transfer` command. The mode is mutually exclusive with `--dry-run` and `--readiness`, requires an explicit copied SQLite `--source`, an operator-created `--dump-marker`, and all Phase 19M confirmation flags.
+
+Execute scope is limited to importing the approved application/domain tables into an empty `inventory_rehearsal` target. It preserves primary keys and source values, preserves `migrations`, keeps `classification_rules` compare-only and target-preserved, preserves `raw_files.saved_path`, skips framework/transient/security tables, and runs post-import count/PK/relationship/JSON/command/raw-evidence/auto-increment validation.
+
+Phase 19M does not reset/truncate tables, create dumps, restore dumps, write to `inventory_rehearsal_restore`, read or mutate live SQLite, change live config, expose web endpoints, generate packages/site kits, change runner/collector traffic, enable Direct `repair_update`, approve production migration, or approve cutover.

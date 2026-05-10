@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,11 +26,19 @@ class MariaDbRehearsalTransfer extends Command
 
     protected $signature = 'inventory:mariadb-rehearsal-transfer
         {--source= : Explicit copied SQLite source path}
-        {--dry-run : Required; this command has no execute mode}
-        {--readiness : Read-only execute-readiness diagnostics; requires --dry-run}
-        {--dump-marker= : Existing MariaDB dump marker/path for read-only readiness validation}';
+        {--dry-run : Read-only planning mode}
+        {--readiness : Read-only execute-readiness diagnostics}
+        {--execute : Controlled Phase 19M write mode for inventory_rehearsal only}
+        {--dump-marker= : Existing MariaDB dump marker/path for readiness/execute validation}
+        {--confirm-rehearsal-target : Confirm target is the approved inventory_rehearsal database}
+        {--confirm-empty-target : Confirm imported application/domain target tables are empty}
+        {--confirm-dump-created : Confirm an operator-created dump exists before execute}
+        {--confirm-no-reset : Confirm execute must not reset or truncate target tables}
+        {--confirm-classification-rules-preserved : Confirm classification_rules stay target-preserved}
+        {--confirm-raw-paths-preserved : Confirm raw_files path references stay unchanged}
+        {--confirm-known-warn-raw-hash-unverified : Accept known warning for unverified raw_hash semantics when mapping is complete}';
 
-    protected $description = 'Dry-run-only app-aware SQLite-to-MariaDB rehearsal transfer planner';
+    protected $description = 'App-aware SQLite-to-MariaDB rehearsal transfer planner and controlled execute importer';
 
     private bool $hasFail = false;
 
@@ -47,6 +54,12 @@ class MariaDbRehearsalTransfer extends Command
     private array $targetTables = [];
 
     private ?PDO $source = null;
+
+    private bool $writesPerformed = false;
+
+    private bool $rawHashWarningPresent = false;
+
+    private string $rawEvidenceMappingReadiness = 'not_run';
 
     /** @var list<string> */
     private array $requiredTables = [
@@ -133,15 +146,16 @@ class MariaDbRehearsalTransfer extends Command
     {
         $this->resetRuntimeState();
 
-        $this->line('MariaDB rehearsal transfer dry-run');
-        $this->infoLine('Dry-run only. No execute mode exists. No data is written.');
+        $this->line('MariaDB rehearsal transfer');
+        $this->infoLine('Phase 19M execute is controlled and requires explicit confirmations.');
         $this->infoLine('Database is authoritative. Raw CSV files are archived evidence only.');
 
-        $sourcePath = $this->option('source');
+        $sourcePath = (string) $this->option('source');
+        $mode = $this->commandMode();
 
-        $this->environmentBoundarySection((string) $sourcePath);
+        $this->environmentBoundarySection($sourcePath, $mode);
         if (! $this->hasFail) {
-            $this->sourceSqliteValidationSection((string) $sourcePath);
+            $this->sourceSqliteValidationSection($sourcePath);
         }
         if (! $this->hasFail) {
             $this->targetMariaDbValidationSection();
@@ -158,8 +172,11 @@ class MariaDbRehearsalTransfer extends Command
             $this->tokenMetadataSummarySection();
             $this->rawEvidenceReferenceSummarySection();
             $this->assignmentOverrideSummarySection();
-            if ((bool) $this->option('readiness')) {
+            if ($mode === 'readiness' || $mode === 'execute') {
                 $this->executeReadinessDiagnosticsSection((string) $this->option('dump-marker'));
+            }
+            if ($mode === 'execute' && ! $this->hasFail) {
+                $this->executeImportSection();
             }
             $this->futureResetPlanSection();
             $this->futureExecutePrerequisitesSection();
@@ -179,24 +196,34 @@ class MariaDbRehearsalTransfer extends Command
         $this->sourceColumns = [];
         $this->targetTables = [];
         $this->source = null;
+        $this->writesPerformed = false;
+        $this->rawHashWarningPresent = false;
+        $this->rawEvidenceMappingReadiness = 'not_run';
     }
 
-    private function environmentBoundarySection(string $sourcePath): void
+    private function commandMode(): string
+    {
+        $modes = array_values(array_filter([
+            (bool) $this->option('dry-run') ? 'dry-run' : null,
+            (bool) $this->option('readiness') ? 'readiness' : null,
+            (bool) $this->option('execute') ? 'execute' : null,
+        ]));
+
+        if (count($modes) !== 1) {
+            return 'invalid';
+        }
+
+        return $modes[0];
+    }
+
+    private function environmentBoundarySection(string $sourcePath, string $mode): void
     {
         $this->section('Environment boundary');
 
-        if (! (bool) $this->option('dry-run')) {
-            $this->fail('--dry-run is required. This command is dry-run-only.');
+        if ($mode === 'invalid') {
+            $this->fail('Exactly one command mode is required: --dry-run, --readiness, or --execute.');
         } else {
-            $this->ok('--dry-run supplied');
-        }
-
-        if ((bool) $this->option('readiness') && ! (bool) $this->option('dry-run')) {
-            $this->fail('--readiness requires --dry-run.');
-        }
-
-        if ((bool) $this->option('readiness')) {
-            $this->ok('--readiness supplied');
+            $this->ok("command_mode={$mode}");
         }
 
         if (trim($sourcePath) === '') {
@@ -205,10 +232,10 @@ class MariaDbRehearsalTransfer extends Command
             $this->ok('--source supplied');
         }
 
-        if ($this->getDefinition()->hasOption('execute')) {
-            $this->fail('--execute option must not exist on this command.');
+        if ($mode === 'execute') {
+            $this->validateExecuteConfirmations();
         } else {
-            $this->ok('--execute option absent');
+            $this->infoLine('writes_performed=no');
         }
 
         $basePath = $this->normalizePath(base_path());
@@ -245,8 +272,33 @@ class MariaDbRehearsalTransfer extends Command
             ? $this->fail('APP_URL contains inventory-pilot.internal.lan')
             : $this->ok('APP_URL does not contain live pilot hostname');
 
-        $this->infoLine('execute_option_available=no');
-        $this->infoLine('writes_performed=no');
+        $this->infoLine('execute_option_available=' . ($this->getDefinition()->hasOption('execute') ? 'yes' : 'no'));
+    }
+
+    private function validateExecuteConfirmations(): void
+    {
+        $this->infoLine('phase=19M_execute_import');
+        $this->infoLine('command_mode=execute');
+
+        if (trim((string) $this->option('dump-marker')) === '') {
+            $this->fail('--dump-marker is required with --execute.');
+        }
+
+        foreach ([
+            'confirm-rehearsal-target',
+            'confirm-empty-target',
+            'confirm-dump-created',
+            'confirm-no-reset',
+            'confirm-classification-rules-preserved',
+            'confirm-raw-paths-preserved',
+            'confirm-known-warn-raw-hash-unverified',
+        ] as $flag) {
+            if (! (bool) $this->option($flag)) {
+                $this->fail("--{$flag} is required with --execute.");
+            }
+        }
+
+        $this->infoLine('execute_confirmations_complete=' . ($this->hasFail ? 'no' : 'yes'));
     }
 
     private function sourceSqliteValidationSection(string $sourcePath): void
@@ -324,7 +376,7 @@ class MariaDbRehearsalTransfer extends Command
         try {
             $ran = DB::table('migrations')->count();
             $this->infoLine('Target migrations row count: ' . $ran);
-            if ((bool) $this->option('readiness') && $ran < self::MIN_EXPECTED_MIGRATION_ROWS) {
+            if (((bool) $this->option('readiness') || (bool) $this->option('execute')) && $ran < self::MIN_EXPECTED_MIGRATION_ROWS) {
                 $this->fail('Target migration state is incomplete for execute-readiness.');
             }
         } catch (Throwable) {
@@ -373,13 +425,13 @@ class MariaDbRehearsalTransfer extends Command
     private function executeReadinessDiagnosticsSection(string $dumpMarker): void
     {
         $this->section('Execute-readiness diagnostics');
-        $this->infoLine('mode=dry_run_execute_readiness');
-        $this->infoLine('writes_performed=no');
-        $this->infoLine('execute_option_available=no');
+        $this->infoLine('mode=' . ((bool) $this->option('execute') ? 'execute_prewrite_readiness' : 'dry_run_execute_readiness'));
+        $this->infoLine('writes_performed=' . ($this->writesPerformed ? 'yes' : 'no'));
+        $this->infoLine('execute_option_available=yes');
         $this->infoLine('target_reset_performed=no');
         $this->infoLine('dump_created=no');
         $this->infoLine('restore_performed=no');
-        $this->infoLine('execute_approved=no');
+        $this->infoLine('execute_approved=' . ((bool) $this->option('execute') ? 'yes' : 'no'));
 
         $this->copiedEvidencePathsReadinessSection();
         $this->emptyTargetValidationSection();
@@ -615,6 +667,8 @@ class MariaDbRehearsalTransfer extends Command
         $mappingReadiness = $mappingFailed || $hashFailed
             ? 'FAIL'
             : ($hashValidationAvailable ? 'PASS' : 'PASS_WITH_WARN');
+        $this->rawEvidenceMappingReadiness = $mappingReadiness;
+        $this->rawHashWarningPresent = ! $hashValidationAvailable && ! $mappingFailed;
 
         $this->infoLine("raw_evidence_mapping_readiness={$mappingReadiness}");
         $this->infoLine("raw_files_count={$rawFilesCount}");
@@ -675,6 +729,353 @@ class MariaDbRehearsalTransfer extends Command
                 continue;
             }
             $this->infoLine("optional_table={$table} source_present=" . ($sourcePresent ? 'yes' : 'no') . ' target_present=' . ($targetPresent ? 'yes' : 'no') . " target_rows={$targetRows}");
+        }
+    }
+
+    private function executeImportSection(): void
+    {
+        $this->section('Phase 19M execute import');
+        $this->infoLine('phase=19M_execute_import');
+        $this->infoLine('command_mode=execute');
+        $this->infoLine('source_exact_match=' . ($this->normalizePath((string) $this->option('source')) === $this->expectedSourcePath() ? 'yes' : 'no'));
+        $this->infoLine('target_database=' . $this->targetDatabase());
+        $this->infoLine('restore_database_written=no');
+        $this->infoLine('reset_performed=no');
+        $this->infoLine('truncate_performed=no');
+        $this->infoLine('dump_created_by_command=no');
+        $this->infoLine('classification_rules_action=preserve_target_skip_import');
+        $this->infoLine('raw_paths_preserved=yes');
+        $this->infoLine("raw_evidence_mapping_readiness={$this->rawEvidenceMappingReadiness}");
+        $this->infoLine('hash_validation_available=' . ($this->rawHashSemantics() === self::RAW_HASH_SEMANTICS_FILE_CONTENT_SHA256 ? 'yes' : 'no'));
+
+        if (! (bool) $this->option('confirm-known-warn-raw-hash-unverified') && $this->rawHashWarningPresent) {
+            $this->fail('--confirm-known-warn-raw-hash-unverified is required for the current raw_hash warning.');
+            return;
+        }
+
+        try {
+            DB::transaction(function (): void {
+                foreach ($this->executeImportTables as $table) {
+                    $this->insertApprovedTable($table);
+                }
+
+                $this->runExecuteValidation(inTransaction: true);
+
+                $forced = (string) config('inventory.mariadb_rehearsal.force_execute_validation_failure', '');
+                if ($forced !== '') {
+                    throw new \RuntimeException("forced {$forced} validation failure");
+                }
+            });
+            $this->writesPerformed = true;
+            $this->infoLine('writes_performed=yes');
+        } catch (Throwable $e) {
+            $this->infoLine('writes_performed=no');
+            $this->infoLine('transaction_rolled_back=yes');
+            $this->fail('Phase 19M execute import rolled back before commit.');
+            return;
+        }
+
+        $autoIncrementPass = $this->validateAndRepairAutoIncrement();
+        $postCommitPass = $this->runExecuteValidation(inTransaction: false);
+
+        $this->infoLine('auto_increment_validation=' . ($autoIncrementPass ? 'PASS' : 'FAIL'));
+        $this->infoLine('restore_db_untouched=' . ($this->restoreDbUntouched() ? 'PASS' : 'FAIL'));
+        $this->infoLine('secrets_printed=no');
+        $this->infoLine('raw_filenames_printed=no');
+        $this->infoLine('raw_paths_printed=no');
+        $this->infoLine('raw_contents_printed=no');
+        $this->infoLine('command_payload_json_printed=no');
+        $this->infoLine('full_runner_guids_printed=no');
+
+        if (! $autoIncrementPass || ! $postCommitPass || ! $this->restoreDbUntouched()) {
+            $this->fail('Phase 19M post-execute validation failed.');
+        }
+    }
+
+    private function insertApprovedTable(string $table): void
+    {
+        if (! $this->sourceHasTable($table) || ! Schema::hasTable($table)) {
+            throw new \RuntimeException("missing approved import table {$table}");
+        }
+
+        $targetColumns = Schema::getColumnListing($table);
+        $columns = array_values(array_intersect($targetColumns, $this->sourceColumns[$table] ?? []));
+        if (! in_array('id', $columns, true)) {
+            throw new \RuntimeException("id column missing for {$table}");
+        }
+
+        $columnSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $columns));
+        $rows = $this->sourceRows('SELECT ' . $columnSql . ' FROM ' . $this->quoteIdentifier($table) . ' ORDER BY id');
+
+        foreach (array_chunk($rows, 100) as $chunk) {
+            if ($chunk !== []) {
+                DB::table($table)->insert($chunk);
+            }
+        }
+
+        $this->infoLine("import_table={$table} source_count={$this->sourceCount($table)} target_count={$this->targetCount($table)}");
+    }
+
+    private function runExecuteValidation(bool $inTransaction): bool
+    {
+        $rowCountsPass = $this->executeRowCountsMatch();
+        $primaryKeyPass = $this->primaryKeysPreserved();
+        $relationshipPass = $this->targetRelationshipsValid();
+        $jsonPass = $this->targetJsonTextValid();
+        $commandLifecyclePass = $this->commandLifecyclePreserved();
+        $assignmentPass = $this->assignmentOverridesPreserved();
+        $rawEvidencePass = in_array($this->rawEvidenceMappingReadiness, ['PASS', 'PASS_WITH_WARN'], true)
+            && $this->rawFileSavedPathsPreserved();
+
+        $this->infoLine('primary_key_preservation=' . ($primaryKeyPass ? 'PASS' : 'FAIL'));
+        $this->infoLine('relationship_validation=' . ($relationshipPass ? 'PASS' : 'FAIL'));
+        $this->infoLine('json_text_validation=' . ($jsonPass ? 'PASS' : 'FAIL'));
+        $this->infoLine('command_lifecycle_validation=' . ($commandLifecyclePass ? 'PASS' : 'FAIL'));
+        $this->infoLine('assignment_override_validation=' . ($assignmentPass ? 'PASS' : 'FAIL'));
+        $this->infoLine('raw_evidence_validation=' . ($rawEvidencePass ? $this->rawEvidenceMappingReadiness : 'FAIL'));
+
+        $pass = $rowCountsPass
+            && $primaryKeyPass
+            && $relationshipPass
+            && $jsonPass
+            && $commandLifecyclePass
+            && $assignmentPass
+            && $rawEvidencePass;
+
+        if ($inTransaction && ! $pass) {
+            throw new \RuntimeException('in-transaction validation failed');
+        }
+
+        return $pass;
+    }
+
+    private function executeRowCountsMatch(): bool
+    {
+        $pass = true;
+        foreach ($this->executeImportTables as $table) {
+            $sourceCount = $this->sourceCount($table);
+            $targetCount = $this->targetCount($table);
+            $this->infoLine("execute_count table={$table} source_count={$sourceCount} target_count={$targetCount}");
+            if ($sourceCount !== $targetCount) {
+                $pass = false;
+            }
+        }
+
+        return $pass;
+    }
+
+    private function primaryKeysPreserved(): bool
+    {
+        foreach ($this->executeImportTables as $table) {
+            if ($this->sourceIdList($table) !== $this->targetIdList($table)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return list<int> */
+    private function sourceIdList(string $table): array
+    {
+        return array_map('intval', array_column($this->sourceRows('SELECT id FROM ' . $this->quoteIdentifier($table) . ' ORDER BY id'), 'id'));
+    }
+
+    /** @return list<int> */
+    private function targetIdList(string $table): array
+    {
+        try {
+            return array_map(fn (object $row): int => (int) $row->id, DB::table($table)->select('id')->orderBy('id')->get()->all());
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    private function targetRelationshipsValid(): bool
+    {
+        $checks = [
+            ['device_identities', 'device_id', 'devices', 'id'],
+            ['device_scans', 'device_id', 'devices', 'id'],
+            ['hardware_snapshots', 'device_scan_id', 'device_scans', 'id'],
+            ['network_observations', 'device_scan_id', 'device_scans', 'id'],
+            ['peripherals', 'device_scan_id', 'device_scans', 'id'],
+            ['device_assignments', 'device_id', 'devices', 'id'],
+            ['change_log', 'device_id', 'devices', 'id'],
+            ['collectors', 'site_id', 'collector_sites', 'site_id'],
+            ['runners', 'site_id', 'collector_sites', 'site_id'],
+            ['runner_commands', 'runner_id', 'runners', 'runner_id'],
+        ];
+
+        foreach ($checks as [$child, $childColumn, $parent, $parentColumn]) {
+            if (! $this->targetHasColumns($child, [$childColumn]) || ! $this->targetHasColumns($parent, [$parentColumn])) {
+                continue;
+            }
+            $missing = DB::table($child . ' as c')
+                ->leftJoin($parent . ' as p', "c.{$childColumn}", '=', "p.{$parentColumn}")
+                ->whereNotNull("c.{$childColumn}")
+                ->whereNull("p.{$parentColumn}")
+                ->count();
+            if ($missing > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function targetJsonTextValid(): bool
+    {
+        foreach ([
+            ['hardware_snapshots', 'snapshot_json'],
+            ['raw_files', 'metadata_json'],
+            ['collectors', 'raw_status_json'],
+            ['runners', 'raw_state_json'],
+            ['runner_commands', 'payload_json'],
+            ['storage_health_observations', 'raw_json'],
+            ['storage_health_observations', 'risk_reasons'],
+        ] as [$table, $column]) {
+            if (! $this->targetHasColumns($table, [$column])) {
+                continue;
+            }
+            foreach (DB::table($table)->select($column)->whereNotNull($column)->get()->all() as $row) {
+                $value = trim((string) $row->{$column});
+                if ($value === '') {
+                    continue;
+                }
+                json_decode($value);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function commandLifecyclePreserved(): bool
+    {
+        if (! $this->targetHasColumns('runner_commands', ['status'])) {
+            return true;
+        }
+        foreach (['queued', 'pending', 'dispatched', 'acknowledged', 'completed', 'succeeded', 'failed'] as $status) {
+            if ($this->sourceCountWhere('runner_commands', 'status', $status) !== (int) DB::table('runner_commands')->where('status', $status)->count()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function assignmentOverridesPreserved(): bool
+    {
+        return $this->sourceCount('device_assignments') === $this->targetCount('device_assignments');
+    }
+
+    private function rawFileSavedPathsPreserved(): bool
+    {
+        if (! $this->sourceHasColumn('raw_files', 'saved_path') || ! $this->targetHasColumns('raw_files', ['saved_path'])) {
+            return true;
+        }
+
+        $source = array_map(fn (array $row): string => (int) $row['id'] . ':' . (string) $row['saved_path'], $this->sourceRows('SELECT id, saved_path FROM raw_files ORDER BY id'));
+        $target = DB::table('raw_files')->select(['id', 'saved_path'])->orderBy('id')->get()->map(fn (object $row): string => (int) $row->id . ':' . (string) $row->saved_path)->all();
+
+        return $source === $target;
+    }
+
+    /** @param list<string> $columns */
+    private function targetHasColumns(string $table, array $columns): bool
+    {
+        if (! Schema::hasTable($table)) {
+            return false;
+        }
+        $targetColumns = Schema::getColumnListing($table);
+        foreach ($columns as $column) {
+            if (! in_array($column, $targetColumns, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function validateAndRepairAutoIncrement(): bool
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            foreach ($this->executeImportTables as $table) {
+                $this->infoLine("auto_increment_table={$table} status=not_mysql_skipped");
+            }
+
+            return true;
+        }
+
+        $pass = true;
+        foreach ($this->executeImportTables as $table) {
+            $maxId = (int) DB::table($table)->max('id');
+            if ($maxId <= 0) {
+                $this->infoLine("auto_increment_table={$table} status=no_rows");
+                continue;
+            }
+
+            $next = $this->mysqlAutoIncrementValue($table);
+            $expected = $maxId + 1;
+            if ($next === null || $next > $maxId) {
+                $this->infoLine("auto_increment_table={$table} status=pass max_id={$maxId}");
+                continue;
+            }
+
+            try {
+                DB::statement('ALTER TABLE `' . str_replace('`', '``', $table) . '` AUTO_INCREMENT = ' . $expected);
+                $this->infoLine("auto_increment_table={$table} status=repaired max_id={$maxId}");
+            } catch (Throwable) {
+                $this->infoLine("auto_increment_table={$table} status=repair_failed max_id={$maxId}");
+                $pass = false;
+            }
+        }
+        $this->infoLine('auto_increment_skipped_table=migrations');
+        $this->infoLine('auto_increment_skipped_table=classification_rules');
+
+        return $pass;
+    }
+
+    private function mysqlAutoIncrementValue(string $table): ?int
+    {
+        try {
+            $row = DB::table('information_schema.TABLES')
+                ->select('AUTO_INCREMENT')
+                ->where('TABLE_SCHEMA', $this->targetDatabase())
+                ->where('TABLE_NAME', $table)
+                ->first();
+
+            return $row?->AUTO_INCREMENT === null ? null : (int) $row->AUTO_INCREMENT;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function restoreDbUntouched(): bool
+    {
+        $configuredRestoreExists = config('inventory.mariadb_rehearsal.restore_database_exists');
+        $configuredRestoreTableCount = config('inventory.mariadb_rehearsal.restore_database_table_count');
+        if ($configuredRestoreExists !== null || $configuredRestoreTableCount !== null) {
+            return (bool) $configuredRestoreExists && (int) $configuredRestoreTableCount === 0;
+        }
+
+        try {
+            if (DB::connection()->getDriverName() !== 'mysql') {
+                return true;
+            }
+
+            $restoreExists = (int) DB::table('information_schema.SCHEMATA')
+                ->where('SCHEMA_NAME', self::RESTORE_DATABASE)
+                ->count() === 1;
+            $tableCount = (int) DB::table('information_schema.TABLES')
+                ->where('TABLE_SCHEMA', self::RESTORE_DATABASE)
+                ->count();
+
+            return $restoreExists && $tableCount === 0;
+        } catch (Throwable) {
+            return false;
         }
     }
 
@@ -907,10 +1308,10 @@ class MariaDbRehearsalTransfer extends Command
     private function futureResetPlanSection(): void
     {
         $this->section('Future reset plan, not executed');
-        $this->infoLine('Future execute phase should start from empty migrated schema or safely reset imported app/domain tables.');
+        $this->infoLine('Phase 19M execute starts from an empty approved target and does not reset or truncate tables.');
         $this->infoLine('Keep migrations table.');
         $this->infoLine('Never clear live SQLite.');
-        $this->infoLine('Never reset inventory_rehearsal_restore in Phase 19I.');
+        $this->infoLine('Never reset inventory_rehearsal_restore in this command.');
         $this->infoLine('No reset/truncate executed in this command.');
     }
 
@@ -918,8 +1319,8 @@ class MariaDbRehearsalTransfer extends Command
     {
         $this->section('Future execute prerequisites');
         $this->infoLine('Review this dry-run evidence.');
-        $this->infoLine('Create MariaDB dump of empty migrated inventory_rehearsal schema before execute mode.');
-        $this->infoLine('Approve a later execute phase before any data write path exists.');
+        $this->infoLine('Use an operator-created MariaDB dump marker before execute mode.');
+        $this->infoLine('Do not treat Phase 19M execute as restore rehearsal, production migration, or cutover approval.');
         $this->infoLine('Keep inventory_rehearsal_restore reserved for restore rehearsal.');
     }
 
