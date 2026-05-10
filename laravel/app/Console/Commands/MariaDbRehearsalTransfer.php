@@ -22,6 +22,8 @@ class MariaDbRehearsalTransfer extends Command
     private const TARGET_DATABASE = 'inventory_rehearsal';
     private const RESTORE_DATABASE = 'inventory_rehearsal_restore';
     private const MIN_EXPECTED_MIGRATION_ROWS = 18;
+    private const RAW_HASH_SEMANTICS_FILE_CONTENT_SHA256 = 'file_content_sha256';
+    private const RAW_HASH_SEMANTICS_UNVERIFIED = 'file_content_hash_unverified';
 
     protected $signature = 'inventory:mariadb-rehearsal-transfer
         {--source= : Explicit copied SQLite source path}
@@ -543,10 +545,15 @@ class MariaDbRehearsalTransfer extends Command
         $rawFilesCount = $this->sourceCount('raw_files');
         $pathColumn = $this->firstExistingColumn('raw_files', ['saved_path', 'archive_path', 'path']);
         $savedPathPopulated = $pathColumn ? $this->sourceNotNullCount('raw_files', $pathColumn) : 0;
+        $rawHashPopulated = $this->sourceHasColumn('raw_files', 'raw_hash') ? $this->sourceNotNullCount('raw_files', 'raw_hash') : 0;
+        $rawHashLength64 = $this->rawHashLengthCount(64);
+        $rawArchiveRootExists = is_dir($this->rawArchivePath());
         $archiveIndex = $this->archiveBasenameIndex();
         $archiveFileCount = array_sum(array_map('count', $archiveIndex));
         $archiveUniqueBasenameCount = count(array_filter($archiveIndex, fn (array $paths): bool => count($paths) === 1));
         $archiveDuplicateBasenameCount = count(array_filter($archiveIndex, fn (array $paths): bool => count($paths) > 1));
+        $rawHashSemantics = $this->rawHashSemantics();
+        $hashValidationAvailable = $rawHashSemantics === self::RAW_HASH_SEMANTICS_FILE_CONTENT_SHA256;
 
         $basenameExists = 0;
         $basenameUnique = 0;
@@ -555,45 +562,64 @@ class MariaDbRehearsalTransfer extends Command
         $unresolved = 0;
         $hashChecked = 0;
         $hashMismatch = 0;
+        $sha256Matches = 0;
+        $sha1Matches = 0;
+        $md5Matches = 0;
 
-        if ($pathColumn !== null) {
+        if ($pathColumn !== null && $rawArchiveRootExists) {
             foreach ($this->sourceRows('SELECT ' . $this->quoteIdentifier($pathColumn) . ' AS path, raw_hash FROM raw_files WHERE ' . $this->quoteIdentifier($pathColumn) . ' IS NOT NULL AND TRIM(CAST(' . $this->quoteIdentifier($pathColumn) . ' AS TEXT)) != \'\'') as $row) {
                 $path = (string) $row['path'];
                 $basename = basename(str_replace('\\', '/', $path));
                 $candidates = $archiveIndex[$basename] ?? [];
+                $resolvedCandidate = null;
                 if ($candidates !== []) {
                     $basenameExists++;
                 }
                 if (count($candidates) === 1) {
                     $basenameUnique++;
                     $suffixResolved++;
-                    $rawHash = strtolower(trim((string) ($row['raw_hash'] ?? '')));
-                    if (preg_match('/^[a-f0-9]{64}$/', $rawHash) === 1) {
-                        $hashChecked++;
-                        $candidateHash = hash_file('sha256', $candidates[0]);
-                        if ($candidateHash !== $rawHash) {
-                            $hashMismatch++;
-                        }
-                    }
-                    continue;
-                }
-                if (count($candidates) > 1) {
+                    $resolvedCandidate = $candidates[0];
+                } elseif (count($candidates) > 1) {
                     $suffixCandidates = $this->suffixMatchingCandidates($path, $candidates);
                     if (count($suffixCandidates) === 1) {
                         $suffixResolved++;
+                        $resolvedCandidate = $suffixCandidates[0];
                     } elseif (count($suffixCandidates) > 1) {
                         $ambiguous++;
                     } else {
                         $unresolved++;
                     }
-                    continue;
+                } else {
+                    $unresolved++;
                 }
-                $unresolved++;
+
+                if ($hashValidationAvailable && $resolvedCandidate !== null) {
+                    $rawHash = strtolower(trim((string) ($row['raw_hash'] ?? '')));
+                    $hashChecked++;
+                    $candidateHash = hash_file('sha256', $resolvedCandidate);
+                    if ($candidateHash !== false && hash_equals($candidateHash, $rawHash)) {
+                        $sha256Matches++;
+                    } else {
+                        $hashMismatch++;
+                    }
+                }
             }
         }
 
+        $mappingFailed = ! $rawArchiveRootExists
+            || $pathColumn === null
+            || $savedPathPopulated !== $rawFilesCount
+            || $ambiguous > 0
+            || $unresolved > 0;
+        $hashFailed = $hashValidationAvailable && $hashMismatch > 0;
+        $mappingReadiness = $mappingFailed || $hashFailed
+            ? 'FAIL'
+            : ($hashValidationAvailable ? 'PASS' : 'PASS_WITH_WARN');
+
+        $this->infoLine("raw_evidence_mapping_readiness={$mappingReadiness}");
         $this->infoLine("raw_files_count={$rawFilesCount}");
         $this->infoLine("saved_path_populated_count={$savedPathPopulated}");
+        $this->infoLine('raw_archive_root_exists=' . ($rawArchiveRootExists ? 'yes' : 'no'));
         $this->infoLine("archive_file_count={$archiveFileCount}");
         $this->infoLine("archive_unique_basename_count={$archiveUniqueBasenameCount}");
         $this->infoLine("archive_duplicate_basename_count={$archiveDuplicateBasenameCount}");
@@ -602,15 +628,29 @@ class MariaDbRehearsalTransfer extends Command
         $this->infoLine("suffix_resolved_count={$suffixResolved}");
         $this->infoLine("ambiguous_count={$ambiguous}");
         $this->infoLine("unresolved_count={$unresolved}");
-        $this->infoLine("hash_checked_count={$hashChecked}");
-        $this->infoLine("hash_mismatch_count={$hashMismatch}");
+        $this->infoLine("raw_hash_populated_count={$rawHashPopulated}");
+        $this->infoLine("raw_hash_length_64_count={$rawHashLength64}");
+        $this->infoLine("raw_hash_semantics={$rawHashSemantics}");
+        $this->infoLine('hash_validation_available=' . ($hashValidationAvailable ? 'yes' : 'no'));
+        $this->infoLine('hash_checked_count=' . ($hashValidationAvailable ? (string) $hashChecked : 'not_applicable'));
+        $this->infoLine('hash_mismatch_count=' . ($hashValidationAvailable ? (string) $hashMismatch : 'not_applicable'));
+        $this->infoLine('hash_algorithm_detected=' . ($hashValidationAvailable ? 'sha256' : 'none'));
+        $this->infoLine("sha256_matches={$sha256Matches}");
+        $this->infoLine("sha1_matches={$sha1Matches}");
+        $this->infoLine("md5_matches={$md5Matches}");
+        $this->infoLine('raw_hash_semantic_warning=' . ($hashValidationAvailable ? 'no' : 'yes'));
         $this->infoLine('raw_filenames_printed=no');
         $this->infoLine('raw_file_lists_printed=no');
         $this->infoLine('raw_contents_printed=no');
         $this->infoLine('resolved_paths_stored=no');
 
-        if ($ambiguous > 0 || $unresolved > 0 || $hashMismatch > 0) {
+        if ($mappingFailed || $hashFailed) {
             $this->fail('Raw evidence path mapping readiness failed.');
+            return;
+        }
+
+        if (! $hashValidationAvailable) {
+            $this->warnLine('raw_hash semantics are unverified; content-hash validation skipped.');
         }
     }
 
@@ -1082,6 +1122,24 @@ class MariaDbRehearsalTransfer extends Command
         return $this->sourceScalarInt('SELECT COUNT(*) FROM ' . $this->quoteIdentifier($table) . ' WHERE ' . $this->quoteIdentifier($column) . ' IS NULL OR TRIM(CAST(' . $this->quoteIdentifier($column) . ' AS TEXT)) = \'\'');
     }
 
+    private function rawHashLengthCount(int $length): int
+    {
+        if (! $this->sourceHasTable('raw_files') || ! $this->sourceHasColumn('raw_files', 'raw_hash')) {
+            return 0;
+        }
+
+        return $this->sourceScalarInt('SELECT COUNT(*) FROM raw_files WHERE raw_hash IS NOT NULL AND LENGTH(TRIM(CAST(raw_hash AS TEXT))) = ' . $length);
+    }
+
+    private function rawHashSemantics(): string
+    {
+        $semantics = strtolower(trim((string) config('inventory.mariadb_rehearsal.raw_hash_semantics', '')));
+
+        return $semantics === self::RAW_HASH_SEMANTICS_FILE_CONTENT_SHA256
+            ? self::RAW_HASH_SEMANTICS_FILE_CONTENT_SHA256
+            : self::RAW_HASH_SEMANTICS_UNVERIFIED;
+    }
+
     private function sourceScalarInt(string $sql): int
     {
         try {
@@ -1263,19 +1321,23 @@ class MariaDbRehearsalTransfer extends Command
         $normalizedStored = strtolower(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $storedPath));
         $segments = array_values(array_filter(explode(DIRECTORY_SEPARATOR, $normalizedStored), fn (string $segment): bool => $segment !== ''));
 
-        $matches = [];
-        foreach ($candidates as $candidate) {
-            $normalizedCandidate = strtolower(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $candidate));
-            for ($length = min(count($segments), 4); $length >= 1; $length--) {
-                $suffix = implode(DIRECTORY_SEPARATOR, array_slice($segments, -$length));
-                if ($suffix !== '' && str_ends_with($normalizedCandidate, $suffix)) {
+        for ($length = min(count($segments), 4); $length >= 1; $length--) {
+            $matches = [];
+            $suffixSegments = array_slice($segments, -$length);
+            foreach ($candidates as $candidate) {
+                $normalizedCandidate = strtolower(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $candidate));
+                $candidateSegments = array_values(array_filter(explode(DIRECTORY_SEPARATOR, $normalizedCandidate), fn (string $segment): bool => $segment !== ''));
+                if ($suffixSegments !== [] && array_slice($candidateSegments, -$length) === $suffixSegments) {
                     $matches[] = $candidate;
-                    break;
                 }
+            }
+
+            if ($matches !== []) {
+                return array_values(array_unique($matches));
             }
         }
 
-        return array_values(array_unique($matches));
+        return [];
     }
 
     /** @return list<string> */

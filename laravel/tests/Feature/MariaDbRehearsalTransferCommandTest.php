@@ -243,6 +243,13 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertStringContainsString('suffix_resolved_count=1', $output);
         $this->assertStringContainsString('ambiguous_count=0', $output);
         $this->assertStringContainsString('unresolved_count=0', $output);
+        $this->assertStringContainsString('raw_evidence_mapping_readiness=PASS_WITH_WARN', $output);
+        $this->assertStringContainsString('raw_hash_semantics=file_content_hash_unverified', $output);
+        $this->assertStringContainsString('hash_validation_available=no', $output);
+        $this->assertStringContainsString('hash_checked_count=not_applicable', $output);
+        $this->assertStringContainsString('hash_mismatch_count=not_applicable', $output);
+        $this->assertStringContainsString('hash_algorithm_detected=none', $output);
+        $this->assertStringContainsString('raw_hash_semantic_warning=yes', $output);
         $this->assertStringContainsString('raw_filenames_printed=no', $output);
         $this->assertStringContainsString('raw_file_lists_printed=no', $output);
         $this->assertStringContainsString('raw_contents_printed=no', $output);
@@ -463,7 +470,7 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertStringContainsString('unresolved_count=1', $output);
     }
 
-    public function test_readiness_raw_hash_mismatch_fails_when_hash_is_available(): void
+    public function test_readiness_raw_hash_length_64_mismatch_warns_when_semantics_unverified(): void
     {
         $fixture = $this->makeReadinessFixture(rawHash: str_repeat('a', 64));
 
@@ -474,9 +481,138 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
             '--dump-marker' => $fixture['dump'],
         ]);
 
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('raw_evidence_mapping_readiness=PASS_WITH_WARN', $output);
+        $this->assertStringContainsString('raw_hash_length_64_count=1', $output);
+        $this->assertStringContainsString('raw_hash_semantics=file_content_hash_unverified', $output);
+        $this->assertStringContainsString('hash_validation_available=no', $output);
+        $this->assertStringContainsString('hash_checked_count=not_applicable', $output);
+        $this->assertStringContainsString('hash_mismatch_count=not_applicable', $output);
+        $this->assertStringContainsString('hash_algorithm_detected=none', $output);
+        $this->assertStringContainsString('sha256_matches=0', $output);
+        $this->assertStringContainsString('sha1_matches=0', $output);
+        $this->assertStringContainsString('md5_matches=0', $output);
+        $this->assertStringContainsString('raw_hash_semantic_warning=yes', $output);
+        $this->assertStringContainsString('Result: WARN', $output);
+        $this->assertStringNotContainsString('file_content_sha256', $output);
+    }
+
+    public function test_readiness_raw_hash_blank_warns_when_mapping_is_complete(): void
+    {
+        $fixture = $this->makeReadinessFixture(rawHash: '');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('raw_evidence_mapping_readiness=PASS_WITH_WARN', $output);
+        $this->assertStringContainsString('raw_hash_populated_count=0', $output);
+        $this->assertStringContainsString('hash_validation_available=no', $output);
+        $this->assertStringContainsString('Result: WARN', $output);
+    }
+
+    public function test_readiness_raw_hash_proven_sha256_mismatch_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture(rawHash: str_repeat('a', 64));
+        Config::set('inventory.mariadb_rehearsal.raw_hash_semantics', 'file_content_sha256');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
         $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('raw_evidence_mapping_readiness=FAIL', $output);
+        $this->assertStringContainsString('raw_hash_semantics=file_content_sha256', $output);
+        $this->assertStringContainsString('hash_validation_available=yes', $output);
         $this->assertStringContainsString('hash_checked_count=1', $output);
         $this->assertStringContainsString('hash_mismatch_count=1', $output);
+        $this->assertStringContainsString('hash_algorithm_detected=sha256', $output);
+    }
+
+    public function test_readiness_raw_hash_proven_sha256_match_passes(): void
+    {
+        $fixture = $this->makeReadinessFixture(rawHash: hash('sha256', 'redacted'));
+        Config::set('inventory.mariadb_rehearsal.raw_hash_semantics', 'file_content_sha256');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('raw_evidence_mapping_readiness=PASS', $output);
+        $this->assertStringContainsString('raw_hash_semantics=file_content_sha256', $output);
+        $this->assertStringContainsString('hash_validation_available=yes', $output);
+        $this->assertStringContainsString('hash_checked_count=1', $output);
+        $this->assertStringContainsString('hash_mismatch_count=0', $output);
+        $this->assertStringContainsString('sha256_matches=1', $output);
+        $this->assertStringContainsString('raw_hash_semantic_warning=no', $output);
+    }
+
+    public function test_readiness_raw_evidence_duplicate_basename_with_unique_suffix_resolves_with_warning(): void
+    {
+        $fixture = $this->makeReadinessFixture(duplicateRawBasename: true, rawSavedPath: 'a/evidence-one.csv');
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('raw_evidence_mapping_readiness=PASS_WITH_WARN', $output);
+        $this->assertStringContainsString('suffix_resolved_count=1', $output);
+        $this->assertStringContainsString('ambiguous_count=0', $output);
+        $this->assertStringContainsString('unresolved_count=0', $output);
+    }
+
+    public function test_readiness_raw_evidence_archive_root_missing_fails(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        unlink($fixture['rawArchive'] . DIRECTORY_SEPARATOR . 'evidence-one.csv');
+        rmdir($fixture['rawArchive']);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('raw_archive_root_exists=no', $output);
+        $this->assertStringContainsString('raw_evidence_mapping_readiness=FAIL', $output);
+    }
+
+    public function test_readiness_raw_evidence_preserves_stored_saved_path_and_does_not_persist_resolution(): void
+    {
+        $fixture = $this->makeReadinessFixture(duplicateRawBasename: true, rawSavedPath: 'a/evidence-one.csv');
+        $before = $this->rawFileSavedPath($fixture['source']);
+
+        [$exitCode, $output] = $this->runCommand([
+            '--dry-run' => true,
+            '--readiness' => true,
+            '--source' => $fixture['source'],
+            '--dump-marker' => $fixture['dump'],
+        ]);
+
+        $after = $this->rawFileSavedPath($fixture['source']);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame('a/evidence-one.csv', $before);
+        $this->assertSame($before, $after);
+        $this->assertStringContainsString('resolved_paths_stored=no', $output);
+        $this->assertStringNotContainsString($fixture['rawArchive'], $output);
     }
 
     public function test_readiness_optional_table_present_in_source_missing_target_fails(): void
@@ -611,6 +747,7 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         bool $duplicateRawBasename = false,
         bool $skipRawArchiveFile = false,
         ?string $rawHash = null,
+        string $rawSavedPath = 'archive/evidence-one.csv',
         bool $sourceSiteTokens = false,
         bool $targetSiteTokens = false,
     ): array {
@@ -654,13 +791,13 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         DB::purge('mysql');
         DB::reconnect('mysql');
 
-        $this->createSourceSqlite($source, $classificationSourceRows, $rawHash, $sourceSiteTokens);
+        $this->createSourceSqlite($source, $classificationSourceRows, $rawHash, $rawSavedPath, $sourceSiteTokens);
         $this->createTargetSchema($classificationTargetRows, $classificationTargetSuffix, $targetSiteTokens);
 
         return compact('root', 'source', 'rawArchive', 'downloads', 'dumpDir', 'dump');
     }
 
-    private function createSourceSqlite(string $source, int $classificationRows, ?string $rawHash, bool $sourceSiteTokens): void
+    private function createSourceSqlite(string $source, int $classificationRows, ?string $rawHash, string $rawSavedPath, bool $sourceSiteTokens): void
     {
         $pdo = new PDO('sqlite:' . $source);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -728,7 +865,7 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $pdo->exec("INSERT INTO device_assignments (id, device_id, department, location, room) VALUES (1, 1, 'IT', 'HQ', '101')");
         $pdo->exec("INSERT INTO change_log (id, device_id) VALUES (1, 1)");
         $stmt = $pdo->prepare('INSERT INTO raw_files (id, saved_path, raw_hash, metadata_json) VALUES (1, ?, ?, ?)');
-        $stmt->execute(['archive/evidence-one.csv', $rawHash ?? '', '{}']);
+        $stmt->execute([$rawSavedPath, $rawHash ?? '', '{}']);
         $pdo->exec("INSERT INTO collectors (id, site_id, raw_status_json) VALUES (1, 'SITE-HQ', '{}')");
         $pdo->exec("INSERT INTO runners (id, site_id, runner_id, transport_mode, raw_state_json) VALUES (1, 'SITE-HQ', 'RUNNER-ONE', 'direct_https', '{}')");
         $pdo->exec("INSERT INTO runner_commands (id, runner_id, status, acknowledged_at, result_upload_id, payload_json) VALUES (1, 'RUNNER-ONE', 'succeeded', '2026-05-10 00:00:00', 1, '{}')");
@@ -826,6 +963,14 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         }
 
         return $counts;
+    }
+
+    private function rawFileSavedPath(string $source): string
+    {
+        $pdo = new PDO('sqlite:' . $source);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        return (string) $pdo->query('SELECT saved_path FROM raw_files WHERE id = 1')->fetchColumn();
     }
 
     private function runCommand(array $parameters): array
