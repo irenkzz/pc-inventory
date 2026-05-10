@@ -20,6 +20,8 @@ The design builds on Phase 19I dry-run validation and Phase 19J manual evidence 
 
 Phase 19M is the first controlled execute implementation. Recommended next prompt after this phase is post-execute validation evidence review, not restore rehearsal or cutover.
 
+Phase 19M.1 adds redacted rollback diagnostics and keeps rollback-on-first-failure behavior. Diagnostics may include failed approved import table, failed stage, rollback reason code, safe exception class, and safe SQLSTATE/category only. SQL text, bindings, row values, raw evidence content, command payload JSON, secrets, full configs, full runner GUIDs, raw filenames, and full paths remain forbidden in output.
+
 Later work should be split into small separately approved phases:
 
 1. Phase 19L: read-only execute-readiness hardening, diagnostics, and tests only; no writes.
