@@ -41,6 +41,8 @@ Manual Phase 19J review concluded Outcome A: `referenced_evidence_missing_count=
 
 Phase 19K follow-up: execute-mode transfer design is documented in `docs/MARIADB_REHEARSAL_EXECUTE_MODE_DESIGN.md`. Phase 19K is design-only and records no-reset empty-target policy, dump-before-execute requirement, `classification_rules` compare-only handling, raw evidence path handling, optional/schema difference policies, pre-execute gates, and post-execute validation requirements. It does not approve transfer execution, restore rehearsal, live DB driver switching, live `.env` changes, package generation, runner/collector traffic changes, production migration, or cutover.
 
+Phase 19N follow-up: post-execute evidence review is documented in `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.md` after the controlled Phase 19M.2 rehearsal execute. Phase 19N is read-only, count-only, and redacted; it does not approve restore rehearsal, live DB driver switching, live `.env` changes, web exposure, package/site-kit generation, runner/collector traffic changes, production migration, or cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.

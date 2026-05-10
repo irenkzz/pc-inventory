@@ -729,3 +729,13 @@ Rollback-on-first-failure remains unchanged, and no reset/truncate cleanup is ad
 Phase 19M.2 fixes the execute import manifest for real migrated `collector_sites`: it is a non-`id` table keyed by `site_id`, not an auto-increment `id` table. Source/target column discovery, pre-insert schema mapping, insert ordering, count validation, primary-key preservation, dependency checks, and auto-increment validation now use table-aware metadata.
 
 `collectors` and `runners` remain dependent on successful `collector_sites` import. If `collector_sites` has source rows but no preserved target rows, execute fails with redacted count-only diagnostics before importing dependent rows. Foreign keys remain enabled, rollback-on-first-failure remains mandatory, and no reset/truncate cleanup is added.
+
+## 35. Phase 19N post-execute evidence review
+
+Phase 19M.2 execute completed in the rehearsal environment with `Result: WARN`. The accepted warning is limited to `raw_hash_semantics=file_content_hash_unverified` with complete raw evidence path mapping: `suffix_resolved_count=353`, `ambiguous_count=0`, and `unresolved_count=0`.
+
+Phase 19N is documented in `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.md`. It is read-only validation and evidence review only. It must not rerun `--execute`, reset/truncate data, create or restore dumps, write to `inventory_rehearsal_restore`, expose a web endpoint, run `php artisan serve`, change live configuration, change runner/collector traffic, generate packages/site kits, approve restore rehearsal, approve production migration, or approve cutover.
+
+The Phase 19N baseline imported counts are: `users=1`, `collector_sites=1`, `devices=37`, `device_identities=160`, `device_scans=353`, `hardware_snapshots=353`, `storage_health_observations=694`, `network_observations=353`, `peripherals=5501`, `device_assignments=86`, `raw_files=353`, `change_log=1337`, `collectors=3`, `runners=38`, and `runner_commands=113`. `migrations` remains `18`, `classification_rules` remains `8`, and `inventory_rehearsal_restore` must remain untouched and empty.
+
+Phase 19O restore rehearsal design may be discussed only after Phase 19N evidence is accepted.

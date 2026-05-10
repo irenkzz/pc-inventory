@@ -24,12 +24,14 @@ Phase 19M.1 adds redacted rollback diagnostics and keeps rollback-on-first-failu
 
 Phase 19M.2 fixes the approved import manifest for real migrated `collector_sites`, which uses `site_id` as its primary key and has no `id` column. Primary-key preservation, schema mapping, dependency checks, and auto-increment validation are table-aware; `collectors` and `runners` remain dependent on successful `collector_sites` import and foreign keys remain enabled.
 
+Phase 19N documents the post-execute evidence review runbook in `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.md`. It is read-only validation only after the Phase 19M.2 rehearsal execute completed with the accepted `raw_hash` semantics warning. It does not approve an execute rerun, restore rehearsal, production migration, cutover, web exposure, package/site-kit generation, runner/collector traffic changes, live configuration changes, or any writes to `inventory_rehearsal_restore`.
+
 Later work should be split into small separately approved phases:
 
 1. Phase 19L: read-only execute-readiness hardening, diagnostics, and tests only; no writes.
 2. Phase 19M: execute import into an empty/approved `inventory_rehearsal` target only, with no self-reset.
 3. Phase 19N: post-execute validation evidence review.
-4. Later restore phase: restore rehearsal into `inventory_rehearsal_restore`, separately approved.
+4. Phase 19O or later restore phase: restore rehearsal into `inventory_rehearsal_restore`, separately approved after Phase 19N evidence is accepted.
 
 ## 3. Command shape policy
 

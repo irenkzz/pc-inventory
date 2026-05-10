@@ -425,6 +425,8 @@ Phase 19J manual Supermicro review concluded Outcome A: the raw evidence warning
 
 Phase 19K follow-up: `docs/MARIADB_REHEARSAL_EXECUTE_MODE_DESIGN.md` documents execute-mode architecture/design boundaries only. It records no-reset empty-target policy, dump-before-execute requirement, `classification_rules` compare-only handling, raw evidence path mapping policy, optional/schema difference policies, pre-execute gates, transfer order, and post-execute validation requirements. It does not approve `--execute`, data transfer, table reset/truncate, dump/restore execution, package generation, live config changes, runner/collector traffic changes, production migration, or cutover.
 
+Phase 19N follow-up: `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.md` documents read-only post-execute evidence review after the controlled Phase 19M.2 rehearsal execute. It requires count-only redacted validation, preserves the accepted unverified `raw_hash` warning, defers portal smoke requiring web exposure, and keeps restore rehearsal, production migration, and cutover unapproved.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:
