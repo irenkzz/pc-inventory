@@ -427,6 +427,8 @@ Phase 19K follow-up: `docs/MARIADB_REHEARSAL_EXECUTE_MODE_DESIGN.md` documents e
 
 Phase 19N follow-up: `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.md` documents read-only post-execute evidence review after the controlled Phase 19M.2 rehearsal execute. It requires count-only redacted validation, preserves the accepted unverified `raw_hash` warning, defers portal smoke requiring web exposure, and keeps restore rehearsal, production migration, and cutover unapproved.
 
+Phase 19O follow-up: `docs/MARIADB_REHEARSAL_RESTORE_REHEARSAL_DESIGN.md` documents restore rehearsal design after Phase 19N was accepted as `PASS_WITH_WARN`. It defines future source/target boundaries for dumping `inventory_rehearsal` and restoring only into `inventory_rehearsal_restore`, count-only restore validation, known warnings, and stop conditions. It does not approve dump creation, restore execution, live DB switching, live `.env` changes, production migration, or cutover.
+
 ## 21. Future production migration gate
 
 A future production migration phase requires separate approval and must include:

@@ -739,3 +739,11 @@ Phase 19N is documented in `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.
 The Phase 19N baseline imported counts are: `users=1`, `collector_sites=1`, `devices=37`, `device_identities=160`, `device_scans=353`, `hardware_snapshots=353`, `storage_health_observations=694`, `network_observations=353`, `peripherals=5501`, `device_assignments=86`, `raw_files=353`, `change_log=1337`, `collectors=3`, `runners=38`, and `runner_commands=113`. `migrations` remains `18`, `classification_rules` remains `8`, and `inventory_rehearsal_restore` must remain untouched and empty.
 
 Phase 19O restore rehearsal design may be discussed only after Phase 19N evidence is accepted.
+
+## 36. Phase 19O restore rehearsal design
+
+Phase 19N evidence review was accepted as `PASS_WITH_WARN`. The accepted warnings are limited to unverified `raw_hash` semantics with complete raw evidence mapping, expected rehearsal-only operational command warnings, the documented accidental test-run note, and the accepted assignment-site helper/schema mismatch.
+
+Phase 19O restore rehearsal design is documented in `docs/MARIADB_REHEARSAL_RESTORE_REHEARSAL_DESIGN.md`. It defines a future restore rehearsal from `inventory_rehearsal` into `inventory_rehearsal_restore`, with pre-restore checks, safe dump evidence, restore target boundaries, count-only validation, known warnings, stop conditions, and acceptance criteria.
+
+Phase 19O is design-only. Restore execution remains unapproved until a separate explicit Phase 19O execution step or Phase 19O.1. Production migration and cutover remain blocked.

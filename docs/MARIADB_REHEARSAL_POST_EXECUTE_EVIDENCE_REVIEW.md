@@ -348,3 +348,23 @@ Phase 19N is accepted when:
 - No secrets or prohibited raw data appear in output.
 - Portal smoke requiring web exposure is deferred or limited to CLI-only validation.
 - Production migration and cutover remain explicitly unapproved.
+
+## 15. Accepted Outcome
+
+Phase 19N was accepted as `PASS_WITH_WARN`.
+
+Accepted state:
+
+```text
+phase=19N_post_execute_evidence_review
+result=PASS_WITH_WARN
+execute_rerun=no
+reset_or_truncate=no
+restore_db_written=no
+production_migration_approved=no
+cutover_approved=no
+```
+
+The accepted warnings are limited to unverified `raw_hash` semantics with complete and unambiguous raw evidence mapping, expected rehearsal-only operational command warnings, the documented accidental test-run note, and the accepted assignment-site helper/schema mismatch.
+
+Phase 19O restore rehearsal design may proceed. Restore execution remains unapproved until a separate explicit approval.
