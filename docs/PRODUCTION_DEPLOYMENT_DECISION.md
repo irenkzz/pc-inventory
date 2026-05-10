@@ -43,6 +43,8 @@ Phase 19K follow-up: execute-mode transfer design is documented in `docs/MARIADB
 
 Phase 19N follow-up: post-execute evidence review is documented in `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.md` after the controlled Phase 19M.2 rehearsal execute. Phase 19N is read-only, count-only, and redacted; it does not approve restore rehearsal, live DB driver switching, live `.env` changes, web exposure, package/site-kit generation, runner/collector traffic changes, production migration, or cutover.
 
+Phase 19O follow-up: restore rehearsal design is documented in `docs/MARIADB_REHEARSAL_RESTORE_REHEARSAL_DESIGN.md` after Phase 19N was accepted as `PASS_WITH_WARN`. Phase 19O is design-only and does not approve dump creation, restore execution, writes to `inventory_rehearsal_restore`, live DB driver switching, live `.env` changes, web exposure, runner/collector traffic changes, package/site-kit generation, production migration, or cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.

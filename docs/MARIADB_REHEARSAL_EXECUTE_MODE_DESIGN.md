@@ -26,12 +26,15 @@ Phase 19M.2 fixes the approved import manifest for real migrated `collector_site
 
 Phase 19N documents the post-execute evidence review runbook in `docs/MARIADB_REHEARSAL_POST_EXECUTE_EVIDENCE_REVIEW.md`. It is read-only validation only after the Phase 19M.2 rehearsal execute completed with the accepted `raw_hash` semantics warning. It does not approve an execute rerun, restore rehearsal, production migration, cutover, web exposure, package/site-kit generation, runner/collector traffic changes, live configuration changes, or any writes to `inventory_rehearsal_restore`.
 
+Phase 19N was accepted as `PASS_WITH_WARN`, so Phase 19O restore rehearsal design may proceed. Phase 19O is documented in `docs/MARIADB_REHEARSAL_RESTORE_REHEARSAL_DESIGN.md` as design-only; it does not approve creating a dump, running restore, writing to `inventory_rehearsal_restore`, production migration, or cutover.
+
 Later work should be split into small separately approved phases:
 
 1. Phase 19L: read-only execute-readiness hardening, diagnostics, and tests only; no writes.
 2. Phase 19M: execute import into an empty/approved `inventory_rehearsal` target only, with no self-reset.
 3. Phase 19N: post-execute validation evidence review.
-4. Phase 19O or later restore phase: restore rehearsal into `inventory_rehearsal_restore`, separately approved after Phase 19N evidence is accepted.
+4. Phase 19O: restore rehearsal design only.
+5. Phase 19O execution step or Phase 19O.1: separately approved restore into `inventory_rehearsal_restore`.
 
 ## 3. Command shape policy
 
