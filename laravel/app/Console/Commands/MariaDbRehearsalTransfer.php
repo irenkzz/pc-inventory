@@ -129,6 +129,41 @@ class MariaDbRehearsalTransfer extends Command
         'runner_commands',
     ];
 
+    /** @return array<string, array<string, mixed>> */
+    private function executeTableManifest(): array
+    {
+        $manifest = [];
+        foreach ($this->executeImportTables as $table) {
+            $manifest[$table] = [
+                'table' => $table,
+                'source_table' => $table,
+                'target_table' => $table,
+                'primary_key_columns' => ['id'],
+                'auto_increment' => true,
+                'required_source_columns' => ['id'],
+                'required_target_columns' => ['id'],
+                'depends_on' => [],
+                'dependent_tables' => [],
+            ];
+        }
+
+        $manifest['collector_sites'] = [
+            'table' => 'collector_sites',
+            'source_table' => 'collector_sites',
+            'target_table' => 'collector_sites',
+            'primary_key_columns' => ['site_id'],
+            'auto_increment' => false,
+            'required_source_columns' => ['site_id'],
+            'required_target_columns' => ['site_id'],
+            'depends_on' => [],
+            'dependent_tables' => ['collectors', 'runners'],
+        ];
+        $manifest['collectors']['depends_on'] = ['collector_sites'];
+        $manifest['runners']['depends_on'] = ['collector_sites'];
+
+        return $manifest;
+    }
+
     /** @var list<string> */
     private array $frameworkTransientTables = [
         'personal_access_tokens',
@@ -835,6 +870,20 @@ class MariaDbRehearsalTransfer extends Command
     {
         $this->failedImportTable = $table;
         $this->failedStage = 'schema_map';
+        $manifest = $this->executeTableManifest()[$table] ?? null;
+        if ($manifest === null) {
+            $this->markExecuteFailure('schema_map', $table, 'schema_mapping_failed');
+            throw new \RuntimeException('approved import table metadata unavailable');
+        }
+
+        foreach ($manifest['depends_on'] as $dependency) {
+            if (! $this->dependencySatisfied((string) $dependency)) {
+                $this->markExecuteFailure('post_table_count_validation', (string) $dependency, 'dependency_not_satisfied');
+                $this->infoLine("dependent_tables_blocked={$table}");
+                throw new \RuntimeException('approved import dependency unavailable');
+            }
+        }
+
         if (! $this->sourceHasTable($table) || ! Schema::hasTable($table)) {
             $this->markExecuteFailure('schema_map', $table, ! $this->sourceHasTable($table) ? 'source_table_missing' : 'target_table_missing');
             throw new \RuntimeException('approved import table unavailable');
@@ -842,16 +891,34 @@ class MariaDbRehearsalTransfer extends Command
 
         $targetColumns = Schema::getColumnListing($table);
         $columns = array_values(array_intersect($targetColumns, $this->sourceColumns[$table] ?? []));
+        foreach ($manifest['required_source_columns'] as $sourceColumn) {
+            if (! $this->sourceHasColumn($table, (string) $sourceColumn)) {
+                $this->markExecuteFailure('schema_map', $table, 'schema_mapping_failed');
+                throw new \RuntimeException('required source column unavailable for import');
+            }
+        }
+        foreach ($manifest['required_target_columns'] as $targetColumn) {
+            if (! in_array((string) $targetColumn, $targetColumns, true)) {
+                $this->markExecuteFailure('schema_map', $table, 'schema_mapping_failed');
+                throw new \RuntimeException('required target column unavailable for import');
+            }
+        }
         foreach ($this->primaryKeyColumnsFor($table) as $primaryKeyColumn) {
             if (! in_array($primaryKeyColumn, $columns, true)) {
                 $this->markExecuteFailure('schema_map', $table, 'schema_mapping_failed');
                 throw new \RuntimeException('primary key column unavailable for import');
             }
         }
+        if (! $this->primaryKeyValuesArePopulated($table)) {
+            $this->markExecuteFailure('schema_map', $table, 'schema_mapping_failed');
+            throw new \RuntimeException('primary key column contains blank values');
+        }
+        $this->schemaMappingDiagnostics($table, $columns);
 
         $this->failedStage = 'read_source';
         $columnSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $columns));
-        $rows = $this->sourceRows('SELECT ' . $columnSql . ' FROM ' . $this->quoteIdentifier($table) . ' ORDER BY id');
+        $orderSql = implode(', ', array_map(fn (string $column): string => $this->quoteIdentifier($column), $this->primaryKeyColumnsFor($table)));
+        $rows = $this->sourceRows('SELECT ' . $columnSql . ' FROM ' . $this->quoteIdentifier($table) . ' ORDER BY ' . $orderSql);
 
         $this->failedStage = 'insert_rows';
         try {
@@ -861,9 +928,11 @@ class MariaDbRehearsalTransfer extends Command
                 $this->markExecuteFailure('insert_rows', $table, $reason, new \RuntimeException('forced redacted insert failure'));
                 throw new \RuntimeException('forced redacted insert failure');
             }
-            foreach (array_chunk($rows, 100) as $chunk) {
-                if ($chunk !== []) {
-                    DB::table($table)->insert($chunk);
+            if ((string) config('inventory.mariadb_rehearsal.force_execute_skip_insert_table', '') !== $table) {
+                foreach (array_chunk($rows, 100) as $chunk) {
+                    if ($chunk !== []) {
+                        DB::table($table)->insert($chunk);
+                    }
                 }
             }
         } catch (Throwable $e) {
@@ -872,6 +941,12 @@ class MariaDbRehearsalTransfer extends Command
         }
 
         $this->infoLine("import_table={$table} source_count={$this->sourceCount($table)} target_count={$this->targetCount($table)}");
+        if ($this->sourceCount($table) !== $this->targetCount($table)) {
+            $this->markExecuteFailure('post_table_count_validation', $table, 'table_import_count_mismatch');
+            $blocked = implode(',', array_map('strval', $manifest['dependent_tables'] ?? []));
+            $this->infoLine('dependent_tables_blocked=' . ($blocked === '' ? 'none' : $blocked));
+            throw new \RuntimeException('approved import table count mismatch');
+        }
     }
 
     private function runExecuteValidation(bool $inTransaction): bool
@@ -950,7 +1025,51 @@ class MariaDbRehearsalTransfer extends Command
     /** @return list<string> */
     private function primaryKeyColumnsFor(string $table): array
     {
-        return $table === 'collector_sites' ? ['site_id'] : ['id'];
+        return array_map('strval', $this->executeTableManifest()[$table]['primary_key_columns'] ?? ['id']);
+    }
+
+    private function primaryKeyValuesArePopulated(string $table): bool
+    {
+        foreach ($this->primaryKeyColumnsFor($table) as $column) {
+            $blank = $this->sourceScalarInt(
+                'SELECT COUNT(*) FROM ' . $this->quoteIdentifier($table)
+                . ' WHERE ' . $this->quoteIdentifier($column) . ' IS NULL OR TRIM(CAST(' . $this->quoteIdentifier($column) . ' AS TEXT)) = \'\''
+            );
+            if ($blank > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @param list<string> $mappedColumns */
+    private function schemaMappingDiagnostics(string $table, array $mappedColumns): void
+    {
+        $primaryKey = implode(',', $this->primaryKeyColumnsFor($table));
+        $primaryKeyMapped = empty(array_diff($this->primaryKeyColumnsFor($table), $mappedColumns));
+        $primaryKeyNonNull = $this->sourceCount($table);
+
+        foreach ($this->primaryKeyColumnsFor($table) as $column) {
+            $primaryKeyNonNull = min($primaryKeyNonNull, $this->sourceNotNullCount($table, $column));
+        }
+
+        $requiredTargetMapped = empty(array_diff(
+            array_map('strval', $this->executeTableManifest()[$table]['required_target_columns'] ?? []),
+            $mappedColumns
+        ));
+
+        $this->infoLine("{$table}_schema_mapping=PASS");
+        $this->infoLine("{$table}_primary_key={$primaryKey}");
+        $this->infoLine("{$table}_primary_key_mapped=" . ($primaryKeyMapped ? 'yes' : 'no'));
+        $this->infoLine("{$table}_primary_key_non_null_count={$primaryKeyNonNull}");
+        $this->infoLine("{$table}_required_target_columns_mapped=" . ($requiredTargetMapped ? 'yes' : 'no'));
+    }
+
+    private function dependencySatisfied(string $table): bool
+    {
+        return $this->sourceCount($table) === 0
+            || ($this->targetCount($table) > 0 && $this->sourcePrimaryKeyList($table) === $this->targetPrimaryKeyList($table));
     }
 
     private function validationFailureStage(bool $rowCountsPass, bool $primaryKeyPass, bool $relationshipPass, bool $jsonPass): string
@@ -1118,16 +1237,16 @@ class MariaDbRehearsalTransfer extends Command
 
     private function validateAndRepairAutoIncrement(): bool
     {
-        if (DB::connection()->getDriverName() !== 'mysql') {
-            foreach ($this->executeImportTables as $table) {
-                $this->infoLine("auto_increment_table={$table} status=not_mysql_skipped");
-            }
-
-            return true;
-        }
-
         $pass = true;
         foreach ($this->executeImportTables as $table) {
+            if (! (bool) ($this->executeTableManifest()[$table]['auto_increment'] ?? true)) {
+                $this->infoLine("auto_increment_table={$table} status=non_auto_increment_skipped");
+                continue;
+            }
+            if (DB::connection()->getDriverName() !== 'mysql') {
+                $this->infoLine("auto_increment_table={$table} status=not_mysql_skipped");
+                continue;
+            }
             if (! $this->targetHasColumns($table, ['id'])) {
                 $this->infoLine("auto_increment_table={$table} status=no_id_column_skipped");
                 continue;
@@ -1305,8 +1424,10 @@ class MariaDbRehearsalTransfer extends Command
             'invalid_datetime',
             'invalid_json',
             'count_validation_failed',
+            'table_import_count_mismatch',
             'primary_key_validation_failed',
             'relationship_validation_failed',
+            'dependency_not_satisfied',
             'auto_increment_validation_failed',
             'unexpected_exception',
             'redaction_guard_failed',

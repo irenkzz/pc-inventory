@@ -779,6 +779,13 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertStringContainsString('assignment_override_validation=PASS', $output);
         $this->assertStringContainsString('raw_evidence_validation=PASS_WITH_WARN', $output);
         $this->assertStringContainsString('auto_increment_validation=PASS', $output);
+        $this->assertStringContainsString('collector_sites_schema_mapping=PASS', $output);
+        $this->assertStringContainsString('collector_sites_primary_key=site_id', $output);
+        $this->assertStringContainsString('collector_sites_primary_key_mapped=yes', $output);
+        $this->assertStringContainsString('collector_sites_primary_key_non_null_count=1', $output);
+        $this->assertStringContainsString('collector_sites_required_target_columns_mapped=yes', $output);
+        $this->assertStringContainsString('auto_increment_table=collector_sites status=non_auto_increment_skipped', $output);
+        $this->assertStringContainsString('auto_increment_table=users status=not_mysql_skipped', $output);
         $this->assertStringContainsString('restore_db_untouched=PASS', $output);
         $this->assertStringContainsString('secrets_printed=no', $output);
         $this->assertStringContainsString('raw_filenames_printed=no', $output);
@@ -791,6 +798,8 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         foreach ($this->approvedImportTables() as $table) {
             $this->assertSame(1, DB::table($table)->count(), $table);
         }
+        $this->assertFalse(Schema::hasColumn('collector_sites', 'id'));
+        $this->assertSame('SITE-HQ', DB::table('collector_sites')->value('site_id'));
         $this->assertSame($beforeMigrations, DB::table('migrations')->count());
         $this->assertSame($beforeClassification, DB::table('classification_rules')->pluck('pattern', 'id')->all());
         $this->assertSame('archive/evidence-one.csv', DB::table('raw_files')->where('id', 1)->value('saved_path'));
@@ -798,6 +807,7 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertStringNotContainsString('evidence-one.csv', $output);
         $this->assertStringNotContainsString($fixture['rawArchive'], $output);
         $this->assertStringNotContainsString('{}', $output);
+        $this->assertStringNotContainsString('SITE-HQ', $output);
         $this->assertStringNotContainsString('RUNNER-ONE', $output);
     }
 
@@ -913,6 +923,47 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $this->assertNoPartialImportedRows();
     }
 
+    public function test_execute_missing_target_collector_site_id_fails_before_insert(): void
+    {
+        $fixture = $this->makeReadinessFixture(targetCollectorSiteIdColumn: false);
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'collector_sites', 'schema_map', 'schema_mapping_failed');
+        $this->assertStringNotContainsString('collector_sites_schema_mapping=PASS', $output);
+        $this->assertNoPartialImportedRows();
+        $this->assertRedactedExecuteFailureOutput($output, $fixture);
+    }
+
+    public function test_execute_null_collector_site_id_fails_before_insert(): void
+    {
+        $fixture = $this->makeReadinessFixture(nullCollectorSiteId: true);
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertRollbackDiagnostics($output, 'collector_sites', 'schema_map', 'schema_mapping_failed');
+        $this->assertNoPartialImportedRows();
+        $this->assertRedactedExecuteFailureOutput($output, $fixture);
+    }
+
+    public function test_execute_collector_sites_count_mismatch_blocks_dependent_tables(): void
+    {
+        $fixture = $this->makeReadinessFixture();
+        Config::set('inventory.mariadb_rehearsal.force_execute_skip_insert_table', 'collector_sites');
+
+        [$exitCode, $output] = $this->runCommand($this->executeParameters($fixture));
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('import_table=users source_count=1 target_count=1', $output);
+        $this->assertStringContainsString('import_table=collector_sites source_count=1 target_count=0', $output);
+        $this->assertStringContainsString('dependent_tables_blocked=collectors,runners', $output);
+        $this->assertRollbackDiagnostics($output, 'collector_sites', 'post_table_count_validation', 'table_import_count_mismatch');
+        $this->assertNoPartialImportedRows();
+        $this->assertRedactedExecuteFailureOutput($output, $fixture);
+    }
+
     public function test_execute_not_null_violation_is_classified_without_values(): void
     {
         $fixture = $this->makeReadinessFixture();
@@ -975,6 +1026,9 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         bool $targetSiteTokens = false,
         bool $sourceCollectorSiteIdColumn = true,
         bool $invalidCollectorSiteLink = false,
+        bool $sourceCollectorSitesHasId = false,
+        bool $nullCollectorSiteId = false,
+        bool $targetCollectorSiteIdColumn = true,
     ): array {
         $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phase19l_' . bin2hex(random_bytes(6));
         $source = $root . DIRECTORY_SEPARATOR . 'source-copy' . DIRECTORY_SEPARATOR . 'database.sqlite';
@@ -1016,20 +1070,19 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         DB::purge('mysql');
         DB::reconnect('mysql');
 
-        $this->createSourceSqlite($source, $classificationSourceRows, $rawHash, $rawSavedPath, $rawMetadataJson, $sourceSiteTokens, $sourceCollectorSiteIdColumn, $invalidCollectorSiteLink);
-        $this->createTargetSchema($classificationTargetRows, $classificationTargetSuffix, $targetSiteTokens);
+        $this->createSourceSqlite($source, $classificationSourceRows, $rawHash, $rawSavedPath, $rawMetadataJson, $sourceSiteTokens, $sourceCollectorSiteIdColumn, $invalidCollectorSiteLink, $sourceCollectorSitesHasId, $nullCollectorSiteId);
+        $this->createTargetSchema($classificationTargetRows, $classificationTargetSuffix, $targetSiteTokens, $targetCollectorSiteIdColumn);
 
         return compact('root', 'source', 'rawArchive', 'downloads', 'dumpDir', 'dump');
     }
 
-    private function createSourceSqlite(string $source, int $classificationRows, ?string $rawHash, string $rawSavedPath, string $rawMetadataJson, bool $sourceSiteTokens, bool $sourceCollectorSiteIdColumn, bool $invalidCollectorSiteLink): void
+    private function createSourceSqlite(string $source, int $classificationRows, ?string $rawHash, string $rawSavedPath, string $rawMetadataJson, bool $sourceSiteTokens, bool $sourceCollectorSiteIdColumn, bool $invalidCollectorSiteLink, bool $sourceCollectorSitesHasId, bool $nullCollectorSiteId): void
     {
         $pdo = new PDO('sqlite:' . $source);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         foreach ([
             'users',
-            'collector_sites',
             'devices',
             'device_identities',
             'device_scans',
@@ -1046,6 +1099,17 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         ] as $table) {
             $pdo->exec("CREATE TABLE {$table} (id INTEGER PRIMARY KEY)");
         }
+        $collectorSiteColumns = [];
+        if ($sourceCollectorSitesHasId) {
+            $collectorSiteColumns[] = 'id INTEGER PRIMARY KEY';
+        }
+        if ($sourceCollectorSiteIdColumn) {
+            $collectorSiteColumns[] = 'site_id TEXT';
+        }
+        if ($collectorSiteColumns === []) {
+            $collectorSiteColumns[] = 'site_name TEXT';
+        }
+        $pdo->exec('CREATE TABLE collector_sites (' . implode(', ', $collectorSiteColumns) . ')');
 
         $pdo->exec('ALTER TABLE device_identities ADD COLUMN device_id INTEGER');
         $pdo->exec('ALTER TABLE device_scans ADD COLUMN device_id INTEGER');
@@ -1078,16 +1142,16 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         $pdo->exec('ALTER TABLE runner_commands ADD COLUMN acknowledged_at TEXT');
         $pdo->exec('ALTER TABLE runner_commands ADD COLUMN result_upload_id INTEGER');
         $pdo->exec('ALTER TABLE runner_commands ADD COLUMN payload_json TEXT');
-        if ($sourceCollectorSiteIdColumn) {
-            $pdo->exec('ALTER TABLE collector_sites ADD COLUMN site_id TEXT');
-        }
-
         $pdo->exec("INSERT INTO users (id) VALUES (1)");
         $collectorSite = $invalidCollectorSiteLink ? 'SITE-OTHER' : 'SITE-HQ';
-        if ($sourceCollectorSiteIdColumn) {
-            $pdo->exec("INSERT INTO collector_sites (id, site_id) VALUES (1, '{$collectorSite}')");
+        if ($sourceCollectorSiteIdColumn && $sourceCollectorSitesHasId) {
+            $value = $nullCollectorSiteId ? 'NULL' : "'{$collectorSite}'";
+            $pdo->exec("INSERT INTO collector_sites (id, site_id) VALUES (1, {$value})");
+        } elseif ($sourceCollectorSiteIdColumn) {
+            $value = $nullCollectorSiteId ? 'NULL' : "'{$collectorSite}'";
+            $pdo->exec("INSERT INTO collector_sites (site_id) VALUES ({$value})");
         } else {
-            $pdo->exec('INSERT INTO collector_sites (id) VALUES (1)');
+            $pdo->exec($sourceCollectorSitesHasId ? 'INSERT INTO collector_sites (id) VALUES (1)' : "INSERT INTO collector_sites (site_name) VALUES ('redacted')");
         }
         $pdo->exec("INSERT INTO devices (id) VALUES (1)");
         $pdo->exec("INSERT INTO device_identities (id, device_id) VALUES (1, 1)");
@@ -1116,7 +1180,7 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
         }
     }
 
-    private function createTargetSchema(int $classificationRows, string $classificationSuffix, bool $targetSiteTokens): void
+    private function createTargetSchema(int $classificationRows, string $classificationSuffix, bool $targetSiteTokens, bool $targetCollectorSiteIdColumn = true): void
     {
         Schema::dropAllTables();
         foreach ([
@@ -1147,8 +1211,10 @@ class MariaDbRehearsalTransferCommandTest extends TestCase
             });
         }
 
-        Schema::create('collector_sites', function ($blueprint): void {
-            $blueprint->string('site_id')->primary();
+        Schema::create('collector_sites', function ($blueprint) use ($targetCollectorSiteIdColumn): void {
+            if ($targetCollectorSiteIdColumn) {
+                $blueprint->string('site_id')->primary();
+            }
             $blueprint->string('site_name')->nullable();
             $blueprint->text('description')->nullable();
         });

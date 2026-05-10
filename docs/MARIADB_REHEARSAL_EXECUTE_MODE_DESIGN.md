@@ -22,6 +22,8 @@ Phase 19M is the first controlled execute implementation. Recommended next promp
 
 Phase 19M.1 adds redacted rollback diagnostics and keeps rollback-on-first-failure behavior. Diagnostics may include failed approved import table, failed stage, rollback reason code, safe exception class, and safe SQLSTATE/category only. SQL text, bindings, row values, raw evidence content, command payload JSON, secrets, full configs, full runner GUIDs, raw filenames, and full paths remain forbidden in output.
 
+Phase 19M.2 fixes the approved import manifest for real migrated `collector_sites`, which uses `site_id` as its primary key and has no `id` column. Primary-key preservation, schema mapping, dependency checks, and auto-increment validation are table-aware; `collectors` and `runners` remain dependent on successful `collector_sites` import and foreign keys remain enabled.
+
 Later work should be split into small separately approved phases:
 
 1. Phase 19L: read-only execute-readiness hardening, diagnostics, and tests only; no writes.
@@ -155,7 +157,8 @@ Transactions and auto-increment:
 - Data inserts should run inside a transaction where MariaDB supports it.
 - Foreign keys should remain enforced if dependency order allows.
 - Temporarily relaxing foreign keys requires later implementation review.
-- After preserving primary keys, each imported table auto-increment must advance to `MAX(id)+1`.
+- After preserving primary keys, each imported auto-increment table must advance to `MAX(id)+1`.
+- Non-auto-increment imported tables such as `collector_sites` are explicitly skipped by auto-increment validation.
 - Auto-increment repair failure stops and requires manual review.
 
 ## 7. `classification_rules=8` policy
