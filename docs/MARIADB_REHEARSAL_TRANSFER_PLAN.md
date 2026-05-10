@@ -722,4 +722,10 @@ Phase 19M does not reset/truncate tables, create dumps, restore dumps, write to 
 
 Phase 19M.1 adds redacted execute rollback diagnostics before a second execute attempt. Failed execute output identifies only safe fields such as failed stage, failed approved import table, rollback reason code, exception class, and SQLSTATE/category when safe. It explicitly reports that SQL messages, SQL text, bindings, row values, raw contents, and secrets are not printed.
 
-Phase 19M.1 also fixes the first execute import-loop issue after `users`: real migrated `collector_sites` uses `site_id` as its primary key and has no `id` column, so import primary-key preservation and auto-increment checks are table-aware. Rollback-on-first-failure remains unchanged, and no reset/truncate cleanup is added.
+Rollback-on-first-failure remains unchanged, and no reset/truncate cleanup is added.
+
+## 34. Phase 19M.2 collector_sites dependency fix
+
+Phase 19M.2 fixes the execute import manifest for real migrated `collector_sites`: it is a non-`id` table keyed by `site_id`, not an auto-increment `id` table. Source/target column discovery, pre-insert schema mapping, insert ordering, count validation, primary-key preservation, dependency checks, and auto-increment validation now use table-aware metadata.
+
+`collectors` and `runners` remain dependent on successful `collector_sites` import. If `collector_sites` has source rows but no preserved target rows, execute fails with redacted count-only diagnostics before importing dependent rows. Foreign keys remain enabled, rollback-on-first-failure remains mandatory, and no reset/truncate cleanup is added.
