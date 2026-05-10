@@ -2,14 +2,15 @@
 
 ## 1. Purpose
 
-Phase 19K documents execute-mode architecture and design boundaries for the MariaDB rehearsal transfer.
+Phase 19K documented execute-mode architecture and design boundaries for the MariaDB rehearsal transfer. Phase 19M implements the first controlled execute import into an empty, approved `inventory_rehearsal` target.
 
-This phase is documentation/design only:
+Phase 19M scope:
 
-- No `--execute` implementation.
-- No data transfer.
+- `--execute` exists only on `inventory:mariadb-rehearsal-transfer`.
+- Data transfer is limited to approved application/domain tables in `inventory_rehearsal`.
 - No target reset or truncate.
-- No MariaDB dump or restore execution.
+- No MariaDB dump creation or restore execution.
+- No writes to `inventory_rehearsal_restore`.
 - No production migration.
 - No production cutover approval.
 
@@ -17,9 +18,7 @@ The design builds on Phase 19I dry-run validation and Phase 19J manual evidence 
 
 ## 2. Phase 19K decision
 
-Phase 19K remains documentation/design only.
-
-Recommended next prompt after this phase is documentation review completion, not execute implementation.
+Phase 19M is the first controlled execute implementation. Recommended next prompt after this phase is post-execute validation evidence review, not restore rehearsal or cutover.
 
 Later work should be split into small separately approved phases:
 
@@ -41,11 +40,12 @@ Policy:
 - Do not create a separate execute command unless later implementation becomes too large.
 - `--source` is always required.
 - No silent source defaults.
-- `--dry-run` remains the safe mode.
-- `--execute` must be explicit in a later approved implementation phase.
-- `--dry-run` and `--execute` must be mutually exclusive.
-- Running without either mode must fail.
-- Future `--execute` must require additional confirmation flags.
+- `--dry-run` remains read-only planning mode.
+- `--readiness` remains read-only readiness mode.
+- `--execute` is explicit Phase 19M write mode.
+- `--dry-run`, `--readiness`, and `--execute` are mutually exclusive.
+- Running without exactly one mode must fail.
+- `--execute` requires all Phase 19M confirmation flags.
 - Missing confirmation must fail closed.
 
 ## 4. Pre-execute gates
