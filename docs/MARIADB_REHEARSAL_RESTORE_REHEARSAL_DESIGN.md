@@ -298,3 +298,29 @@ production_migration_approved=no
 cutover_approved=no
 result=DESIGN_ONLY
 ```
+
+## 9. Phase 19O.1 Accepted Result
+
+The controlled restore rehearsal was later executed under separate approval and accepted as `PASS_WITH_WARN`. The result evidence is documented in `docs/MARIADB_REHEARSAL_RESTORE_REHEARSAL_RESULT.md`.
+
+Summary:
+
+```text
+phase=19O.1_restore_rehearsal
+result=PASS_WITH_WARN
+restore_source_database=inventory_rehearsal
+restore_target_database=inventory_rehearsal_restore
+restore_target_pre_restore_empty=yes
+dump_created=yes
+dump_file_nonzero=yes
+restore_completed=yes
+restore_into_inventory_rehearsal=no
+restore_into_live_db=no
+restore_count_validation=PASS
+relationship_validation=PASS
+relationship_orphan_count=0
+restore_raw_evidence_validation=PASS_WITH_WARN
+raw_hash_semantics=file_content_hash_unverified
+```
+
+Phase 19O.1 acceptance does not approve production migration, cutover, live DB switching, live `.env` changes, web exposure, runner/collector repointing, package/site-kit generation, or Direct `repair_update`.
