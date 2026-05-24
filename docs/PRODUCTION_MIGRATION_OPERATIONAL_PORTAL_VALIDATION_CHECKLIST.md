@@ -39,6 +39,8 @@ Phase 19R documented the first prerequisite block: maintenance window, write fre
 
 Phase 19T documents the future validation checklist only. It does not approve backup execution, copied-source creation, production migration, or cutover.
 
+Phase 19U follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_COPIED_SOURCE_RUNBOOK.md` references Phase 19T validation as future bracketing evidence only. Phase 19U does not execute operational or portal validation.
+
 ## 4. Future Operational Command Checklist
 
 These are future read-only validation candidates only. Do not run them in Phase 19T.

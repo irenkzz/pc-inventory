@@ -74,6 +74,8 @@ Phase 19R follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_SOURCE_POLICY.md` doc
 
 Phase 19T follow-up: `docs/PRODUCTION_MIGRATION_OPERATIONAL_PORTAL_VALIDATION_CHECKLIST.md` documents future operational, portal, command lifecycle, token metadata, Direct HTTPS, collector-share, and raw evidence validation requirements only. It does not execute validation, migration, backup, copied-source creation, or cutover.
 
+Phase 19U follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_COPIED_SOURCE_RUNBOOK.md` designs a future backup/copy-source execution runbook only. It does not execute backup/copy-source work, migration, validation, or cutover.
+
 ## 6. Key Risks
 
 - Scope creep into production migration.
