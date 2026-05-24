@@ -55,6 +55,8 @@ Phase 19T follow-up: future operational, portal, command, token, Direct HTTPS, c
 
 Phase 19U follow-up: future fresh backup and copied-source execution runbook design is documented in `docs/PRODUCTION_MIGRATION_BACKUP_AND_COPIED_SOURCE_RUNBOOK.md`. Phase 19U remains design-only and does not approve production migration or cutover.
 
+Phase 19V follow-up: source-of-truth sync and the future backup/copy-source execution approval checklist are documented in `docs/PRODUCTION_MIGRATION_BACKUP_COPY_EXECUTION_APPROVAL_CHECKLIST.md`. Phase 19V remains documentation-only and does not approve production migration or cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.

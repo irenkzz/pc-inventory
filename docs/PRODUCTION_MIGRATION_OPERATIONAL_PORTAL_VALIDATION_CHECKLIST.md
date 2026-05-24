@@ -41,6 +41,8 @@ Phase 19T documents the future validation checklist only. It does not approve ba
 
 Phase 19U follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_COPIED_SOURCE_RUNBOOK.md` references Phase 19T validation as future bracketing evidence only. Phase 19U does not execute operational or portal validation.
 
+Phase 19V follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_COPY_EXECUTION_APPROVAL_CHECKLIST.md` records that Phase 19T validation remains future just-in-time evidence and must not be reused if stale.
+
 ## 4. Future Operational Command Checklist
 
 These are future read-only validation candidates only. Do not run them in Phase 19T.

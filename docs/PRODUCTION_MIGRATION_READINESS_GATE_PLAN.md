@@ -76,6 +76,8 @@ Phase 19T follow-up: `docs/PRODUCTION_MIGRATION_OPERATIONAL_PORTAL_VALIDATION_CH
 
 Phase 19U follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_COPIED_SOURCE_RUNBOOK.md` designs a future backup/copy-source execution runbook only. It does not execute backup/copy-source work, migration, validation, or cutover.
 
+Phase 19V follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_COPY_EXECUTION_APPROVAL_CHECKLIST.md` records source-of-truth sync and the future backup/copy-source execution approval checklist only. It does not execute backup/copy-source work, validation, migration, or cutover.
+
 ## 6. Key Risks
 
 - Scope creep into production migration.

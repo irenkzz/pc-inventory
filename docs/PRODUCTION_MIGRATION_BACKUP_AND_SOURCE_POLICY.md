@@ -48,6 +48,8 @@ Phase 19T follow-up: `docs/PRODUCTION_MIGRATION_OPERATIONAL_PORTAL_VALIDATION_CH
 
 Phase 19U follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_COPIED_SOURCE_RUNBOOK.md` converts this accepted policy into a future runbook design. Backup execution and copied-source creation remain unapproved.
 
+Phase 19V follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_COPY_EXECUTION_APPROVAL_CHECKLIST.md` confirms approval boundaries before any future backup/copy-source execution phase. Backup execution and copied-source creation remain unapproved.
+
 ## 4. Maintenance Window Policy
 
 A maintenance window is required before any later production migration execution because the authoritative database, raw evidence references, runner and collector intake, command lifecycle state, and generated-download references must remain stable while the final source copy and migration preparation occur.
