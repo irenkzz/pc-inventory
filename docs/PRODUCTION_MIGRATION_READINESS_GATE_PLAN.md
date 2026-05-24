@@ -72,6 +72,8 @@ This sequence is guidance only. It does not authorize implementation, execution,
 
 Phase 19R follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_SOURCE_POLICY.md` documents only the first prerequisite block: maintenance window, write freeze, fresh verified live backup scope, and copied-source policy. It does not approve backup execution, copied-source creation, production migration, or cutover.
 
+Phase 19T follow-up: `docs/PRODUCTION_MIGRATION_OPERATIONAL_PORTAL_VALIDATION_CHECKLIST.md` documents future operational, portal, command lifecycle, token metadata, Direct HTTPS, collector-share, and raw evidence validation requirements only. It does not execute validation, migration, backup, copied-source creation, or cutover.
+
 ## 6. Key Risks
 
 - Scope creep into production migration.

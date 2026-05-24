@@ -51,6 +51,8 @@ Phase 19Q follow-up: production migration readiness-gate planning is documented 
 
 Phase 19R follow-up: production migration backup and source policy planning is documented in `docs/PRODUCTION_MIGRATION_BACKUP_AND_SOURCE_POLICY.md`. Phase 19R remains planning-only and does not approve backup execution, copied-source creation, production migration, or cutover.
 
+Phase 19T follow-up: future operational, portal, command, token, Direct HTTPS, collector-share, and raw evidence validation requirements are documented in `docs/PRODUCTION_MIGRATION_OPERATIONAL_PORTAL_VALIDATION_CHECKLIST.md`. Phase 19T remains documentation-only and does not approve production migration or cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
