@@ -63,13 +63,14 @@ These gates do not approve production migration or cutover by themselves.
 
 Later phases should remain separately reviewed and approved. Suggested sequence:
 
-- Phase 19R: production migration runbook design only.
-- Phase 19S: fresh live backup and copied-source policy design only.
+- Phase 19R: first prerequisite block policy only: maintenance window, write freeze, fresh backup, and copied-source policy.
 - Phase 19T: operational and portal validation checklist.
 - Later separately approved production migration execution phase.
 - Later separately approved cutover decision phase.
 
 This sequence is guidance only. It does not authorize implementation, execution, migration, or cutover.
+
+Phase 19R follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_SOURCE_POLICY.md` documents only the first prerequisite block: maintenance window, write freeze, fresh verified live backup scope, and copied-source policy. It does not approve backup execution, copied-source creation, production migration, or cutover.
 
 ## 6. Key Risks
 
