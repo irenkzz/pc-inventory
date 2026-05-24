@@ -49,6 +49,8 @@ Phase 19P follow-up: Phase 19O.1 controlled restore rehearsal evidence is docume
 
 Phase 19Q follow-up: production migration readiness-gate planning is documented in `docs/PRODUCTION_MIGRATION_READINESS_GATE_PLAN.md`. Phase 19Q records the remaining readiness gates only; production migration and cutover remain unapproved.
 
+Phase 19R follow-up: production migration backup and source policy planning is documented in `docs/PRODUCTION_MIGRATION_BACKUP_AND_SOURCE_POLICY.md`. Phase 19R remains planning-only and does not approve backup execution, copied-source creation, production migration, or cutover.
+
 ## 2. Current Deployment Context
 
 - Active Laravel app runs on Supermicro at `D:\inventory\laravel`.
