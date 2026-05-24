@@ -46,6 +46,8 @@ Phase 19R does not satisfy all production migration readiness gates. It does not
 
 Phase 19T follow-up: `docs/PRODUCTION_MIGRATION_OPERATIONAL_PORTAL_VALIDATION_CHECKLIST.md` defines future validation evidence that should bracket later backup, source-copy, migration, and cutover decisions. Phase 19T does not approve backup execution or copied-source creation.
 
+Phase 19U follow-up: `docs/PRODUCTION_MIGRATION_BACKUP_AND_COPIED_SOURCE_RUNBOOK.md` converts this accepted policy into a future runbook design. Backup execution and copied-source creation remain unapproved.
+
 ## 4. Maintenance Window Policy
 
 A maintenance window is required before any later production migration execution because the authoritative database, raw evidence references, runner and collector intake, command lifecycle state, and generated-download references must remain stable while the final source copy and migration preparation occur.
