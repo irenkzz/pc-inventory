@@ -445,6 +445,23 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertStringContainsString('Hybrid means one organization may use both modes across different sites', $directReadme);
         $this->assertStringContainsString('It does not mean mixing Direct HTTPS and collector-share inside one runner installation', $directReadme);
         $this->assertStringNotContainsString('dddddddddddddddddddddddddddddddd', $directReadme);
+        $this->assertStringContainsString('INSTALL_THIS_PC_RUNNER_ONLY.cmd', $directReadme);
+        $this->assertStringContainsString('installer-direct-https-*.log', $directReadme);
+
+        $this->assertFileDoesNotExist($buildRoot . '/INSTALL_RUNNER_COMMAND.txt');
+        $this->assertStringContainsString('InternalInventoryRunner\\logs\\installer-direct-https-', (string) file_get_contents($buildRoot . '/README_SITE_KIT.md'));
+        $this->assertStringNotContainsString('install-site-kit.log', (string) file_get_contents($buildRoot . '/README_SITE_KIT.md'));
+        $this->assertStringNotContainsString('install-site-kit.log', (string) file_get_contents($buildRoot . '/READ_ME_FIRST_FOR_BRANCH.txt'));
+
+        $this->assertStringContainsString('%LOCALAPPDATA%\\Temp\\InternalInventorySiteKit\\site-kit-SITE-HQ', $directRunnerLauncher);
+        $this->assertStringNotContainsString('%PUBLIC%', $directRunnerLauncher);
+        $this->assertStringContainsString("'-ResultPath','%RESULT%','-PauseOnFail'", $directRunnerLauncher);
+        $this->assertStringContainsString('RESULT: FAIL', $directRunnerLauncher);
+        $this->assertStringContainsString('exit /b 1', $directRunnerLauncher);
+        $this->assertGreaterThan(
+            strpos($directRunnerLauncher, 'for /f'),
+            strpos($directRunnerLauncher, 'rmdir /s /q "%STAGE%"', strpos($directRunnerLauncher, 'for /f'))
+        );
 
         $directInstaller = (string) file_get_contents($buildRoot . '/runner/scripts/install_direct_https_runner.ps1');
         $this->assertStringContainsString('serverBaseUrl must use https://', $directInstaller);

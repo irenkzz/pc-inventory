@@ -131,19 +131,21 @@ class SiteKitBuilder
             $this->writeJson($buildRoot . DIRECTORY_SEPARATOR . 'branch-share/packages/runner/runner-manifest.json', $manifest);
         }
 
-        File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_RUNNER_COMMAND.txt', $this->runnerInstallCommand(
-            $shareRoot,
-            $siteId,
-            $siteName,
-            $collectorName,
-            $defaultLocation,
-            $defaultRoom,
-            $runnerVersion,
-            $taskName,
-            $scanIntervalMinutes,
-            $runnerPollIntervalMinutes,
-            $taskRandomDelayMinutes,
-        ) . PHP_EOL);
+        if ($transportMode !== 'direct_https') {
+            File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_RUNNER_COMMAND.txt', $this->runnerInstallCommand(
+                $shareRoot,
+                $siteId,
+                $siteName,
+                $collectorName,
+                $defaultLocation,
+                $defaultRoom,
+                $runnerVersion,
+                $taskName,
+                $scanIntervalMinutes,
+                $runnerPollIntervalMinutes,
+                $taskRandomDelayMinutes,
+            ) . PHP_EOL);
+        }
 
         if ($collectorEnabled) {
             File::put($buildRoot . DIRECTORY_SEPARATOR . 'INSTALL_COLLECTOR_COMMAND.txt', $this->collectorInstallCommand($collectorPollIntervalMinutes) . PHP_EOL);
@@ -332,10 +334,14 @@ class SiteKitBuilder
 
     private function directHttpsRunnerCmd(string $siteId): string
     {
+        // Stage is per-user (not %PUBLIC%) because it holds the site token; it is deleted before exit.
         return "@echo off\r\n"
             . "setlocal\r\n"
             . "set \"SOURCE=%~dp0\"\r\n"
-            . "set \"STAGE=%PUBLIC%\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
+            . "set \"STAGE=%LOCALAPPDATA%\\Temp\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
+            . "set \"RESULT=%STAGE%\\result.txt\"\r\n"
+            . "set \"STATUS=FAIL\"\r\n"
+            . "set \"LOGPATH=not written (installer did not start or was cancelled)\"\r\n"
             . "echo Staging Direct HTTPS runner installer locally...\r\n"
             . "pushd \"%SOURCE%\"\r\n"
             . "if errorlevel 1 (\r\n"
@@ -345,19 +351,109 @@ class SiteKitBuilder
             . ")\r\n"
             . "if exist \"%STAGE%\" rmdir /s /q \"%STAGE%\"\r\n"
             . "mkdir \"%STAGE%\" >nul 2>nul\r\n"
-            . "robocopy \".\" \"%STAGE%\" /MIR /XD data storage vendor node_modules .git /XF install-site-kit.log /R:2 /W:1 >nul\r\n"
+            . "robocopy \".\" \"%STAGE%\" /MIR /XD data storage vendor node_modules .git /XF install-site-kit.log result.txt /R:2 /W:1 >nul\r\n"
             . "set \"RC=%ERRORLEVEL%\"\r\n"
             . "popd\r\n"
             . "if %RC% GEQ 8 (\r\n"
             . "  echo Could not copy installer locally. Robocopy exit code: %RC%\r\n"
+            . "  cd /d \"%TEMP%\"\r\n"
+            . "  if exist \"%STAGE%\" rmdir /s /q \"%STAGE%\"\r\n"
             . "  pause\r\n"
             . "  exit /b %RC%\r\n"
             . ")\r\n"
             . "cd /d \"%STAGE%\"\r\n"
-            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\runner\\scripts\\install_direct_https_runner.ps1','-ConfigPath','%STAGE%\\runner\\config\\runner-config.template.json','-UseComputerNameAsRunnerId')\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\runner\\scripts\\install_direct_https_runner.ps1','-ConfigPath','%STAGE%\\runner\\config\\runner-config.template.json','-UseComputerNameAsRunnerId','-ResultPath','%RESULT%','-PauseOnFail')\"\r\n"
+            . "if exist \"%RESULT%\" (\r\n"
+            . "  for /f \"usebackq tokens=1,* delims==\" %%A in (\"%RESULT%\") do (\r\n"
+            . "    if /i \"%%A\"==\"status\" set \"STATUS=%%B\"\r\n"
+            . "    if /i \"%%A\"==\"log\" set \"LOGPATH=%%B\"\r\n"
+            . "  )\r\n"
+            . ")\r\n"
+            . "cd /d \"%TEMP%\"\r\n"
+            . "if exist \"%STAGE%\" rmdir /s /q \"%STAGE%\"\r\n"
             . "echo.\r\n"
-            . "echo Direct HTTPS runner installer finished. If there were errors, send the installer log path shown above to IT.\r\n"
-            . "pause\r\n";
+            . "echo Installer log: %LOGPATH%\r\n"
+            . "if /i \"%STATUS%\"==\"PASS\" (\r\n"
+            . "  echo RESULT: PASS - Direct HTTPS runner installed and the first scan succeeded.\r\n"
+            . "  pause\r\n"
+            . "  exit /b 0\r\n"
+            . ")\r\n"
+            . "echo RESULT: FAIL - send the installer log above to IT.\r\n"
+            . "pause\r\n"
+            . "exit /b 1\r\n";
+    }
+
+    /**
+     * IExpress cannot keep sub-folders, so the SFX carries the kit zip plus this wrapper.
+     * The wrapper holds no token; the zip does.
+     */
+    public function sfxWrapperCmd(string $siteId, string $zipName): string
+    {
+        return "@echo off\r\n"
+            . "setlocal\r\n"
+            . "set \"WORK=%TEMP%\\InternalInventorySiteKit-sfx-{$siteId}\"\r\n"
+            . "if exist \"%WORK%\" rmdir /s /q \"%WORK%\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -LiteralPath '%~dp0{$zipName}' -DestinationPath '%WORK%' -Force\"\r\n"
+            . "if errorlevel 1 (\r\n"
+            . "  echo Could not extract the installer.\r\n"
+            . "  pause\r\n"
+            . "  exit /b 1\r\n"
+            . ")\r\n"
+            . "call \"%WORK%\\site-kit-{$siteId}\\INSTALL_THIS_PC_RUNNER_ONLY.cmd\"\r\n"
+            . "set \"RC=%ERRORLEVEL%\"\r\n"
+            . "cd /d \"%TEMP%\"\r\n"
+            . "rmdir /s /q \"%WORK%\"\r\n"
+            . "exit /b %RC%\r\n";
+    }
+
+    public function iexpressSed(string $siteId, string $targetExe, string $sourceDir, string $wrapperName, string $zipName): string
+    {
+        $sourceDir = rtrim($sourceDir, '\\/') . '\\';
+
+        return "[Version]\r\nClass=IEXPRESS\r\nSEDVersion=3\r\n"
+            . "[Options]\r\nPackagePurpose=InstallApp\r\nShowInstallProgramWindow=0\r\nHideExtractAnimation=1\r\n"
+            . "UseLongFileName=1\r\nInsertReboot=0\r\nRebootMode=N\r\nCheckAdminRights=0\r\n"
+            . "FinishMessage=\r\nInstallPrompt=\r\nDisplayLicense=\r\n"
+            . "TargetName={$targetExe}\r\nFriendlyName=Inventory runner setup {$siteId}\r\n"
+            . "AppLaunched=cmd /c {$wrapperName}\r\nPostInstallCmd=<None>\r\nAdminQuietInstCmd=\r\nUserQuietInstCmd=\r\n"
+            . "SourceFiles=SourceFiles\r\n"
+            . "[Strings]\r\nFILE0=\"{$wrapperName}\"\r\nFILE1=\"{$zipName}\"\r\n"
+            . "[SourceFiles]\r\nSourceFiles0={$sourceDir}\r\n"
+            . "[SourceFiles0]\r\n%FILE0%=\r\n%FILE1%=\r\n";
+    }
+
+    /** Optional single-file SFX. Returns status + message; never throws for a missing iexpress.exe. */
+    public function buildExe(array $result): array
+    {
+        $iexpress = (getenv('SystemRoot') ?: 'C:\\Windows') . '\\System32\\iexpress.exe';
+        if (PHP_OS_FAMILY !== 'Windows' || ! is_file($iexpress)) {
+            return ['status' => 'skipped', 'message' => 'iexpress.exe not found (Windows only); folder kit and zip were built without an exe.'];
+        }
+
+        $siteId = $result['site_id'];
+        $dir = dirname($result['zip_path']);
+        $zipName = basename($result['zip_path']);
+        $wrapperName = 'sfx_setup.cmd';
+        $exePath = $dir . DIRECTORY_SEPARATOR . "{$siteId}-runner-setup.exe";
+        $sedDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'inventory-sfx-' . bin2hex(random_bytes(4));
+        File::ensureDirectoryExists($sedDir);
+
+        try {
+            File::copy($result['zip_path'], $sedDir . DIRECTORY_SEPARATOR . $zipName);
+            File::put($sedDir . DIRECTORY_SEPARATOR . $wrapperName, $this->sfxWrapperCmd($siteId, $zipName));
+            $sedPath = $sedDir . DIRECTORY_SEPARATOR . 'kit.sed';
+            File::put($sedPath, $this->iexpressSed($siteId, $exePath, $sedDir, $wrapperName, $zipName));
+            if (is_file($exePath)) {
+                File::delete($exePath);
+            }
+            exec('"' . $iexpress . '" /N /Q "' . $sedPath . '" 2>&1', $out, $code);
+        } finally {
+            File::deleteDirectory($sedDir);
+        }
+
+        return is_file($exePath)
+            ? ['status' => 'built', 'path' => $exePath, 'message' => 'Contains the site token. Treat as a secret.']
+            : ['status' => 'failed', 'message' => "iexpress exited with code {$code}; folder kit and zip are unaffected."];
     }
 
     private function directHttpsRunnerAliasCmd(string $siteId): string
@@ -701,7 +797,7 @@ PS1;
                 . "- Runner scan interval: {$scanIntervalMinutes} minutes\n\n"
                 . "## Simple install\n\n"
                 . "On each runner PC, run `INSTALL_THIS_PC_RUNNER_ONLY.cmd` normally from the extracted kit. It stages locally, then asks for administrator approval.\n\n"
-                . "The installer writes `install-site-kit.log` in this folder.\n";
+                . "The launcher ends with a clear PASS or FAIL and prints the installer log path. The log is `C:\\ProgramData\\InternalInventoryRunner\\logs\\installer-direct-https-<timestamp>.log` (or a file under `%TEMP%` if that folder does not exist). Send it to IT if the result is FAIL.\n";
         }
 
         return "# Site kit for {$siteId}\n\n"
@@ -725,7 +821,8 @@ PS1;
                 . "\r\n"
                 . "1. Extract this ZIP file first. Do not run it from inside the ZIP viewer.\r\n"
                 . "2. On runner PCs, run INSTALL_THIS_PC_RUNNER_ONLY.cmd normally. It copies itself locally, then asks for administrator approval.\r\n"
-                . "3. If installation fails, send install-site-kit.log to IT.\r\n"
+                . "3. The window ends with PASS or FAIL and prints the installer log path. If it FAILS, send that log to IT.\r\n"
+                . "   Log folder: C:\\ProgramData\\InternalInventoryRunner\\logs\\installer-direct-https-*.log (or %TEMP% fallback)\r\n"
                 . "\r\n"
                 . "Runner PC requirements:\r\n"
                 . "- Windows administrator permission\r\n"
@@ -772,7 +869,8 @@ PS1;
             . "- Do not generate official packages from IT-ADMIN.\r\n"
             . "\r\n"
             . "Run:\r\n"
-            . "INSTALL_THIS_PC_DIRECT_HTTPS_RUNNER.cmd\r\n"
+            . "INSTALL_THIS_PC_RUNNER_ONLY.cmd\r\n"
+            . "It ends with PASS or FAIL and prints the installer log path (C:\\ProgramData\\InternalInventoryRunner\\logs\\installer-direct-https-*.log).\r\n"
             . "\r\n"
             . "Verify in portal:\r\n"
             . "- /runners\r\n"
