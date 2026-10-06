@@ -66,6 +66,27 @@ if (-not (Test-Path $ConfigPath)) {
     throw "ConfigPath not found: $ConfigPath"
 }
 
+# The scheduled task must not run from the kit folder: the launchers stage the kit in a temporary
+# folder and delete it afterwards. Install a permanent copy and register the task from there.
+$InstalledRoot = Join-Path $env:ProgramData 'InternalInventoryCollector\app'
+$sourceRoot = (Resolve-Path -Path $CollectorRoot).Path.TrimEnd('\')
+$sourceConfig = (Resolve-Path -Path $ConfigPath).Path
+if ($sourceRoot -ine $InstalledRoot.TrimEnd('\')) {
+    New-Item -ItemType Directory -Path $InstalledRoot -Force | Out-Null
+    foreach ($item in @(Get-ChildItem -Path $sourceRoot -Force | Where-Object { $_.Name -ne 'logs' })) {
+        Copy-Item -Path $item.FullName -Destination $InstalledRoot -Recurse -Force
+    }
+    Copy-Item -Path $sourceConfig -Destination (Join-Path $InstalledRoot 'collector_config.json') -Force
+    $CollectorRoot = $InstalledRoot
+    $ConfigPath = Join-Path $InstalledRoot 'collector_config.json'
+    # collector_config.json holds the site token: Administrators + SYSTEM (+ the task user in current-user mode).
+    & icacls.exe $InstalledRoot /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Null
+    if ($RunAsCurrentUser) {
+        & icacls.exe $InstalledRoot /grant:r ('{0}:(OI)(CI)M' -f [Security.Principal.WindowsIdentity]::GetCurrent().Name) | Out-Null
+    }
+    Write-Host "Collector files installed to: $InstalledRoot"
+}
+
 $python = Resolve-PythonExecutable
 
 $relayPath = Join-Path $CollectorRoot 'relay.py'
