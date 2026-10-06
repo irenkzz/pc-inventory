@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreClassificationRuleRequest;
+use App\Models\AuditLog;
 use App\Models\ClassificationRule;
 use App\Models\Device;
 use App\Services\Inventory\DeviceAssignmentOverrideService;
@@ -30,13 +31,15 @@ class ClassificationRuleController extends Controller
     {
         $rule = $request->normalizedRule();
 
-        ClassificationRule::query()->updateOrCreate(
+        $saved = ClassificationRule::query()->updateOrCreate(
             [
                 'rule_type' => $rule['rule_type'],
                 'match_value' => $rule['match_value'],
             ],
             $rule,
         );
+
+        AuditLog::record('classification_rule.saved', (string) $saved->id, ['rule_type' => $rule['rule_type'], 'match_value' => $rule['match_value']]);
 
         return redirect()
             ->route('admin.classification-rules.index')
@@ -46,6 +49,7 @@ class ClassificationRuleController extends Controller
     public function update(StoreClassificationRuleRequest $request, ClassificationRule $classificationRule): RedirectResponse
     {
         $classificationRule->forceFill($request->normalizedRule())->save();
+        AuditLog::record('classification_rule.updated', (string) $classificationRule->id, ['rule_type' => $classificationRule->rule_type, 'match_value' => $classificationRule->match_value]);
 
         return redirect()
             ->route('admin.classification-rules.index')
@@ -54,6 +58,7 @@ class ClassificationRuleController extends Controller
 
     public function destroy(ClassificationRule $classificationRule): RedirectResponse
     {
+        AuditLog::record('classification_rule.deleted', (string) $classificationRule->id, ['rule_type' => $classificationRule->rule_type, 'match_value' => $classificationRule->match_value]);
         $classificationRule->delete();
 
         return redirect()

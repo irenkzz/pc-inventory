@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Runner;
 use App\Models\RunnerCommand;
 use App\Services\Runner\CommandQueueService;
@@ -101,7 +102,7 @@ class RunnerController extends Controller
                 'command_type' => 'repair_update',
                 'payload_json' => [],
                 'status' => 'completed',
-                'requested_by' => 'portal',
+                'requested_by' => auth()->user()?->email ?? 'portal',
                 'requested_at' => now(),
                 'acknowledged_at' => now(),
                 'completed_at' => now(),
@@ -131,7 +132,8 @@ class RunnerController extends Controller
         }
 
         $existingAny = $commands->activeForRunner($runner->runner_id);
-        $command = $commands->queue($runner->runner_id, $runner->site_id, $commandType, 'portal');
+        $command = $commands->queue($runner->runner_id, $runner->site_id, $commandType, auth()->user()?->email ?? 'portal');
+        AuditLog::record('command.queued', $runner->runner_id, ['command_type' => $commandType, 'command_id' => $command->id]);
 
         $message = "{$label} queued for {$runner->runner_id}.";
         if ($existingAny !== null) {

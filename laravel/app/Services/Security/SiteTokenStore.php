@@ -56,6 +56,98 @@ class SiteTokenStore
         return [];
     }
 
+    /**
+     * Set (or unset when null) fields on one record in the JSON file store.
+     * Returns false when the store is env-based, the file is missing, or the record is not found.
+     * Atomic: temp file + rename. Throws nothing the caller must handle except I/O (caller decides).
+     */
+    public function updateRecord(string $siteId, string $tokenType, array $fields): bool
+    {
+        if (trim((string) config('inventory.site_tokens_json', '')) !== '') {
+            return false;
+        }
+
+        $path = $this->filePath();
+        if ($path === '' || ! is_file($path) || ! is_writable($path)) {
+            return false;
+        }
+
+        $raw = json_decode((string) file_get_contents($path), true);
+        if (! is_array($raw)) {
+            return false;
+        }
+
+        $found = false;
+        $apply = function (mixed $entry) use ($fields, &$found): array {
+            $found = true;
+            $entry = is_array($entry) ? $entry : ['token' => (string) $entry];
+            foreach ($fields as $key => $value) {
+                if ($value === null) {
+                    unset($entry[$key]);
+                } else {
+                    $entry[$key] = $value;
+                }
+            }
+
+            return $entry;
+        };
+
+        foreach ($raw as $key => $value) {
+            if (is_int($key) && is_array($value)) {
+                if (trim((string) ($value['site_id'] ?? '')) === $siteId && $this->typeOf($value) === $tokenType) {
+                    $raw[$key] = $apply($value);
+                    break;
+                }
+
+                continue;
+            }
+
+            if (trim((string) $key) !== $siteId) {
+                continue;
+            }
+
+            if (is_string($value)) {
+                if ($tokenType === self::TYPE_COLLECTOR) {
+                    $raw[$key] = $apply(['token' => $value, 'token_type' => $tokenType]);
+                }
+            } elseif (is_array($value) && array_is_list($value)) {
+                foreach ($value as $i => $item) {
+                    if (is_array($item) && $this->typeOf($item) === $tokenType) {
+                        $raw[$key][$i] = $apply($item);
+                        break;
+                    }
+                }
+            } elseif (is_array($value) && array_key_exists('token', $value)) {
+                if ($this->typeOf($value) === $tokenType) {
+                    $raw[$key] = $apply($value);
+                }
+            } elseif (is_array($value) && isset($value[$tokenType])) {
+                $raw[$key][$tokenType] = $apply($value[$tokenType]);
+            }
+
+            if ($found) {
+                break;
+            }
+        }
+
+        if (! $found) {
+            return false;
+        }
+
+        $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
+        if (file_put_contents($tmp, json_encode($raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false || ! rename($tmp, $path)) {
+            @unlink($tmp);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function typeOf(array $entry): string
+    {
+        return trim((string) ($entry['token_type'] ?? '')) ?: self::TYPE_COLLECTOR;
+    }
     public function source(): string
     {
         if (trim((string) config('inventory.site_tokens_json', '')) !== '') {
@@ -158,6 +250,7 @@ class SiteTokenStore
             'token' => $token,
             'token_type' => $tokenType,
             'revoked_at' => $this->optionalString($record['revoked_at'] ?? null),
+            'expires_at' => $this->optionalString($record['expires_at'] ?? null),
             'last_used_at' => $this->optionalString($record['last_used_at'] ?? null),
             'last_used_ip' => $this->optionalString($record['last_used_ip'] ?? null),
         ];

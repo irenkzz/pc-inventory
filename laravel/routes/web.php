@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\ChangeController;
 use App\Http\Controllers\Admin\ClassificationRuleController;
 use App\Http\Controllers\Admin\CollectorController;
@@ -42,21 +43,14 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/', DashboardController::class)->name('admin.dashboard');
     Route::get('/devices', [DeviceController::class, 'index'])->name('admin.devices.index');
     Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('admin.devices.show');
-    Route::post('/devices/{device}/assignment', [DeviceController::class, 'updateAssignment'])->name('admin.devices.assignment.update');
     Route::get('/inventory-review', [InventoryReviewController::class, 'index'])->name('admin.inventory-review.index');
     Route::get('/pilot-readiness', PilotReadinessController::class)->name('admin.pilot-readiness.index');
     Route::get('/setup-wizard', SetupWizardController::class)->name('admin.setup-wizard.index');
     Route::get('/changes', [ChangeController::class, 'index'])->name('admin.changes.index');
     Route::get('/storage-health', [StorageHealthController::class, 'index'])->name('admin.storage-health.index');
     Route::get('/classification-rules', [ClassificationRuleController::class, 'index'])->name('admin.classification-rules.index');
-    Route::post('/classification-rules', [ClassificationRuleController::class, 'store'])->name('admin.classification-rules.store');
-    Route::post('/classification-rules/apply', [ClassificationRuleController::class, 'apply'])->name('admin.classification-rules.apply');
-    Route::put('/classification-rules/{classificationRule}', [ClassificationRuleController::class, 'update'])->name('admin.classification-rules.update');
-    Route::delete('/classification-rules/{classificationRule}', [ClassificationRuleController::class, 'destroy'])->name('admin.classification-rules.destroy');
     Route::get('/runners', [RunnerController::class, 'index'])->name('admin.runners.index');
     Route::get('/runners/{runner}', [RunnerController::class, 'show'])->name('admin.runners.show');
-    Route::post('/runners/{runner}/manual-scan', [RunnerController::class, 'manualScan'])->name('admin.runners.manual-scan');
-    Route::post('/runners/{runner}/repair', [RunnerController::class, 'repair'])->name('admin.runners.repair');
     Route::get('/collectors', [CollectorController::class, 'index'])->name('admin.collectors.index');
     Route::get('/commands', [CommandController::class, 'index'])->name('admin.commands.index');
     Route::get('/downloads', [DownloadController::class, 'index'])->name('admin.downloads.index');
@@ -70,4 +64,16 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/reports/devices/export', [ReportController::class, 'exportDevices'])->name('admin.reports.devices.export');
     Route::get('/reports/changes/export', [ReportController::class, 'exportChanges'])->name('admin.reports.changes.export');
     Route::get('/reports/sites/export', [ReportController::class, 'exportSites'])->name('admin.reports.sites.export');
+    Route::get('/audit-log', AuditLogController::class)->name('admin.audit-log.index');
+
+    // Mutating routes: admin only (viewer role is read-only).
+    Route::middleware('role:admin')->group(function (): void {
+        Route::post('/devices/{device}/assignment', [DeviceController::class, 'updateAssignment'])->name('admin.devices.assignment.update');
+        Route::post('/classification-rules', [ClassificationRuleController::class, 'store'])->name('admin.classification-rules.store');
+        Route::post('/classification-rules/apply', [ClassificationRuleController::class, 'apply'])->name('admin.classification-rules.apply');
+        Route::put('/classification-rules/{classificationRule}', [ClassificationRuleController::class, 'update'])->name('admin.classification-rules.update');
+        Route::delete('/classification-rules/{classificationRule}', [ClassificationRuleController::class, 'destroy'])->name('admin.classification-rules.destroy');
+        Route::post('/runners/{runner}/manual-scan', [RunnerController::class, 'manualScan'])->name('admin.runners.manual-scan');
+        Route::post('/runners/{runner}/repair', [RunnerController::class, 'repair'])->name('admin.runners.repair');
+    });
 });

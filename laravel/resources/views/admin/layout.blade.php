@@ -986,6 +986,7 @@
                 'items' => [
                     ['label' => 'Evidence', 'route' => 'admin.raw-evidence.index', 'match' => 'admin.raw-evidence.*'],
                     ['label' => 'Reports', 'route' => 'admin.reports.index', 'match' => 'admin.reports.*'],
+                    ['label' => 'Audit Log', 'route' => 'admin.audit-log.index', 'match' => 'admin.audit-log.*'],
                 ],
             ],
         ];
