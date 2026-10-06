@@ -168,13 +168,13 @@ class InstallPreflightCommandTest extends TestCase
         $this->assertStringContainsString('Command availability only is checked; nested Artisan commands are not run.', $output);
     }
 
-    public function test_setup_wizard_not_implemented_is_reported(): void
+    public function test_setup_wizard_implemented_read_only_status_is_reported(): void
     {
         [, $output] = $this->runCommand();
 
         $this->assertStringContainsString('Setup Wizard Readiness', $output);
-        $this->assertStringContainsString('[WARN] Portal Setup Wizard MVP is not implemented yet.', $output);
-        $this->assertStringContainsString('[INFO] First admin/company/site setup remains manual until Phase 18C.', $output);
+        $this->assertStringContainsString('[OK] Portal Setup Wizard MVP is implemented as authenticated read-only guidance at /setup-wizard.', $output);
+        $this->assertStringContainsString('[INFO] User/site/token creation and production configuration remain manual.', $output);
     }
 
     public function test_mvp_manual_boundaries_are_printed(): void
