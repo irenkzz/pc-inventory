@@ -1,0 +1,16 @@
+{
+  "_comment": "Sample profile for a remote site reached through the Cloudflare Tunnel hostname (see docs/CLOUDFLARE_TUNNEL_REMOTE_ACCESS.md). Copy to a real profile, set a real site_id/site_name, and build the kit on Supermicro only. The direct runner token is read from the token store, never from this file.",
+  "transport_mode": "direct_https",
+  "collector_required": false,
+  "site_id": "SITE-REMOTE-01",
+  "site_name": "Remote Site 01",
+  "server_base_url": "https://inventory.tvripapua.web.id",
+  "runner_version": "1.0.22",
+  "scan_interval_minutes": 240,
+  "runner_poll_interval_minutes": 5,
+  "task_random_delay_minutes": 15,
+  "default_location": "Remote Site 01",
+  "default_room": "General",
+  "task_name": "InternalInventoryRunner",
+  "install_root": "C:\\ProgramData\\InternalInventoryRunner"
+}
