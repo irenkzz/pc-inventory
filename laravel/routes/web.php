@@ -56,8 +56,6 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/runners/{runner}', [RunnerController::class, 'show'])->name('admin.runners.show');
     Route::get('/collectors', [CollectorController::class, 'index'])->name('admin.collectors.index');
     Route::get('/commands', [CommandController::class, 'index'])->name('admin.commands.index');
-    Route::get('/downloads', [DownloadController::class, 'index'])->name('admin.downloads.index');
-    Route::get('/downloads/{filename}', [DownloadController::class, 'show'])->name('admin.downloads.show');
     Route::get('/raw-evidence', [RawEvidenceController::class, 'index'])->name('admin.raw-evidence.index');
     Route::get('/raw-evidence/{rawFile}', [RawEvidenceController::class, 'show'])->name('admin.raw-evidence.show');
     Route::get('/reports', [ReportController::class, 'index'])->name('admin.reports.index');
@@ -69,8 +67,10 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/reports/sites/export', [ReportController::class, 'exportSites'])->name('admin.reports.sites.export');
     Route::get('/audit-log', AuditLogController::class)->name('admin.audit-log.index');
 
-    // Mutating routes: admin only (viewer role is read-only).
+    // Admin only: mutating routes (viewer role is read-only) and kit downloads (they embed site tokens).
     Route::middleware('role:admin')->group(function (): void {
+        Route::get('/downloads', [DownloadController::class, 'index'])->name('admin.downloads.index');
+        Route::get('/downloads/{filename}', [DownloadController::class, 'show'])->name('admin.downloads.show');
         Route::post('/devices/{device}/assignment', [DeviceController::class, 'updateAssignment'])->name('admin.devices.assignment.update');
         Route::post('/classification-rules', [ClassificationRuleController::class, 'store'])->name('admin.classification-rules.store');
         Route::post('/classification-rules/apply', [ClassificationRuleController::class, 'apply'])->name('admin.classification-rules.apply');
