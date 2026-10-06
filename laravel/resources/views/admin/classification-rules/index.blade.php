@@ -9,12 +9,15 @@
                 Manage how scanner evidence is translated into portal departments and site names.
             </p>
         </div>
+        @if(auth()->user()?->isAdmin())
         <form method="post" action="{{ route('admin.classification-rules.apply') }}" class="dashboard-toolbar">
             @csrf
             <button type="submit" class="secondary">Apply to existing devices</button>
         </form>
+        @endif
     </section>
 
+    @if(auth()->user()?->isAdmin())
     <h3>Add Rule</h3>
     <form method="post" action="{{ route('admin.classification-rules.store') }}" class="form-grid">
         @csrf
@@ -53,6 +56,7 @@
             <button type="submit">Save rule</button>
         </div>
     </form>
+    @endif
 
     @foreach($ruleTypes as $type => $label)
         <div class="panel dashboard-section">
@@ -83,6 +87,9 @@
                     @forelse($rules[$type] ?? [] as $rule)
                         <tr>
                             <td colspan="6">
+                                @if(! auth()->user()?->isAdmin())
+                                    {{ $rule->match_value }} &rarr; {{ $rule->output_value }} (priority {{ $rule->priority }}, {{ $rule->is_active ? 'active' : 'inactive' }}) {{ $rule->notes }}
+                                @else
                                 <form method="post" action="{{ route('admin.classification-rules.update', $rule) }}" class="form-grid" style="margin:0; box-shadow:none; border:0; padding:0; grid-template-columns: 1fr 1fr 90px 100px 1fr auto;">
                                     @csrf
                                     @method('put')
@@ -119,6 +126,7 @@
                                     @method('delete')
                                     <button type="submit" class="secondary">Delete</button>
                                 </form>
+                                @endif
                             </td>
                         </tr>
                     @empty

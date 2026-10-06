@@ -21,7 +21,8 @@ class PruneInventory extends Command
         {--peripherals-days= : Override retention.peripherals_days}
         {--storage-health-days= : Override retention.storage_health_observations_days}
         {--change-log-days= : Override retention.change_log_days}
-        {--runner-commands-days= : Override retention.runner_commands_days}';
+        {--runner-commands-days= : Override retention.runner_commands_days}
+        {--audit-log-days= : Override retention.audit_log_days}';
 
     protected $description = 'Prune old inventory history (dry-run unless --force). Latest scan per device and open commands are always kept';
 
@@ -38,6 +39,7 @@ class PruneInventory extends Command
             'storage_health_observations' => 'storage-health',
             'change_log' => 'change-log',
             'runner_commands' => 'runner-commands',
+            'audit_log' => 'audit-log',
         ] as $key => $opt) {
             $value = $this->option("{$opt}-days");
             $value = ($value === null || $value === '') ? config("inventory.retention.{$key}_days") : $value;
@@ -73,6 +75,8 @@ class PruneInventory extends Command
         $rows['runner_commands'] = $this->prune($force, fn () => DB::table('runner_commands')
             ->whereNotIn('status', ['pending', 'dispatched'])
             ->where('requested_at', '<', $cutoff('runner_commands')));
+
+        $rows['audit_log'] = $this->prune($force, fn () => DB::table('audit_log')->where('created_at', '<', $cutoff('audit_log')));
 
         $this->line($force ? 'MODE: FORCE (rows deleted)' : 'MODE: DRY-RUN (nothing deleted; pass --force to delete)');
         $this->table(['Table', $force ? 'Deleted' : 'Would delete'], collect($rows)->map(fn ($n, $t) => [$t, $n])->values()->all());

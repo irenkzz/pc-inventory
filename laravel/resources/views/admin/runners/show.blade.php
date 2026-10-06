@@ -171,6 +171,7 @@
                     <p class="panel-subtitle">Only one active command file is supported per runner. A different command supersedes the current active command.</p>
                 </div>
             </div>
+            @if(auth()->user()?->isAdmin())
             <div class="actions">
                 <form method="post" action="{{ route('admin.runners.manual-scan', $runner) }}">
                     @csrf
@@ -185,6 +186,7 @@
                     </form>
                 @endif
             </div>
+            @endif
             @if($activeCommand)
                 <div class="notice" style="margin-top:14px">
                     Active command #{{ $activeCommand->id }}:

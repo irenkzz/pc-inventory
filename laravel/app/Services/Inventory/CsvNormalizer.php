@@ -95,6 +95,28 @@ class CsvNormalizer
         'HardwareHash' => 'hardware_hash',
         'Scan_Time' => 'scan_time',
         'Scan_Time_Display' => 'scan_time_display',
+        'Battery_Present' => 'battery_present',
+        'Battery_Health_Percent' => 'battery_health_percent',
+        'Hotfix_Count' => 'hotfix_count',
+        'Last_Hotfix_Date' => 'last_hotfix_date',
+        'BitLocker_System_Drive' => 'bitlocker_system_drive',
+        'TPM_Enabled' => 'tpm_enabled',
+        'TPM_Activated' => 'tpm_activated',
+        'TPM_Spec_Version' => 'tpm_spec_version',
+        'Installed_Software_Count' => 'installed_software_count',
+    ];
+
+    /** Optional security/health fields; kept in snapshot_json only, absent in old CSVs. */
+    public const EXTRA_FIELDS = [
+        'battery_present',
+        'battery_health_percent',
+        'hotfix_count',
+        'last_hotfix_date',
+        'bitlocker_system_drive',
+        'tpm_enabled',
+        'tpm_activated',
+        'tpm_spec_version',
+        'installed_software_count',
     ];
 
     public const SNAPSHOT_FIELDS = [

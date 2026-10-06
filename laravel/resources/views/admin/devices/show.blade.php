@@ -209,6 +209,7 @@
                     <span class="badge info">Updated {{ \App\Support\InventoryTime::format($device->manual_assignment_updated_at) }}</span>
                 @endif
             </div>
+            @if(auth()->user()?->isAdmin())
             <form method="post" action="{{ route('admin.devices.assignment.update', $device) }}" class="form-grid" style="margin:0; box-shadow:none;">
                 @csrf
                 <label>
@@ -231,6 +232,9 @@
                     <button type="submit">Save assignment</button>
                 </div>
             </form>
+            @else
+                <p class="info-note">Read-only access: assignment can only be changed by an admin.</p>
+            @endif
         </div>
 
         <div class="panel">
@@ -301,6 +305,37 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <section id="security-health" class="dashboard-section section-anchor">
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <h3 class="panel-title">Security &amp; health</h3>
+                    <p class="panel-subtitle">Best-effort values from the latest scan; blank means the runner could not read them.</p>
+                </div>
+            </div>
+            <?php
+                $secPct = fn (string $v): string => $v === '' ? '' : $v . '%';
+                $secItems = [
+                    'Battery present' => $value('battery_present'),
+                    'Battery health' => $secPct($value('battery_health_percent')),
+                    'Installed hotfixes' => $value('hotfix_count'),
+                    'Last hotfix date' => $value('last_hotfix_date'),
+                    'BitLocker (system drive)' => $value('bitlocker_system_drive'),
+                    'TPM enabled' => $value('tpm_enabled'),
+                    'TPM activated' => $value('tpm_activated'),
+                    'TPM spec version' => $value('tpm_spec_version'),
+                    'Installed software (count)' => $value('installed_software_count'),
+                ];
+            ?>
+            <dl class="compact-dl">
+                @foreach($secItems as $label => $item)
+                    <dt>{{ $label }}</dt>
+                    <dd>{{ $item !== '' ? $item : 'not reported' }}</dd>
+                @endforeach
+            </dl>
         </div>
     </section>
 
