@@ -14,6 +14,8 @@ class TrustProxies extends Middleware
      */
     protected $proxies = [
     '192.168.100.10',
+    // cloudflared runs on this host and connects over loopback; it forwards the real client IP.
+    '127.0.0.1',
 ];
 
     /**
