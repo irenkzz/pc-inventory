@@ -205,8 +205,8 @@ class InstallPreflight extends Command
     {
         $this->section('Setup Wizard Readiness');
 
-        $this->warnLine('Portal Setup Wizard MVP is not implemented yet.');
-        $this->infoLine('First admin/company/site setup remains manual until Phase 18C.');
+        $this->ok('Portal Setup Wizard MVP is implemented as authenticated read-only guidance at /setup-wizard.');
+        $this->infoLine('User/site/token creation and production configuration remain manual.');
     }
 
     private function manualBoundariesSection(): void
@@ -248,7 +248,7 @@ class InstallPreflight extends Command
         $this->infoLine('Run inventory:doctor separately for operational diagnostics.');
         $this->infoLine('Run inventory:production-readiness before production or cutover review.');
         $this->infoLine('Run inventory:direct-site-kit-audit before Direct HTTPS package rollout.');
-        $this->infoLine('Review docs/INSTALLATION_PRODUCTIZATION_STRATEGY.md before Phase 18C setup wizard work.');
+        $this->infoLine('Review docs/INSTALLATION_PRODUCTIZATION_STRATEGY.md before installation or productization changes.');
     }
 
     private function resultSection(): void
