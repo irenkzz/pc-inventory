@@ -18,7 +18,7 @@ class SiteKitSfxTest extends TestCase
 
         $this->assertStringContainsString('Class=IEXPRESS', $sed);
         $this->assertStringContainsString('TargetName=C:\\out\\SITE-HQ-runner-setup.exe', $sed);
-        $this->assertStringContainsString('AppLaunched=cmd /c sfx_setup.cmd', $sed);
+        $this->assertStringContainsString('AppLaunched=cmd /c .\sfx_setup.cmd', $sed);
         $this->assertStringContainsString('HideExtractAnimation=1', $sed);
         $this->assertStringContainsString('SourceFiles0=C:\\tmp\\sfx\\', $sed);
         $this->assertStringContainsString('FILE1="site-kit-SITE-HQ.zip"', $sed);
