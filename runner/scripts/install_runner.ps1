@@ -29,13 +29,25 @@ function Ensure-Directory {
 }
 
 function Grant-RunnerInstallPermissions {
-    param([string]$Path)
+    param([string]$Path, [string]$RunAsUser = '')
 
     if (-not (Test-Path $Path)) { return }
 
-    & icacls.exe $Path /grant '*S-1-5-32-545:(OI)(CI)M' /T /C | Out-Host
+    # Root (and scripts\, tools\) = Administrators + SYSTEM only; Users get nothing.
+    # Current-user task: that user gets Modify on config\, state\, logs\, data\ only.
+    foreach ($sub in 'config', 'state', 'logs', 'data') { Ensure-Directory (Join-Path $Path $sub) }
+    & icacls.exe $Path /remove:g '*S-1-5-32-545' /T /C | Out-Host
+    & icacls.exe $Path /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Host
     if ($LASTEXITCODE -ne 0) {
-        throw "Could not grant modify permission on runner install root: $Path"
+        throw "Could not set permissions on runner install root: $Path"
+    }
+    if ($RunAsUser) {
+        foreach ($sub in 'config', 'state', 'logs', 'data') {
+            & icacls.exe (Join-Path $Path $sub) /grant ($RunAsUser + ':(OI)(CI)M') | Out-Host
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not grant modify permission on $sub for $RunAsUser"
+            }
+        }
     }
 }
 
@@ -80,7 +92,9 @@ if (-not (Test-Path $SourceRoot)) {
 
 Ensure-Directory $InstallRoot
 Copy-Item -Path (Join-Path $SourceRoot '*') -Destination $InstallRoot -Recurse -Force
-Grant-RunnerInstallPermissions -Path $InstallRoot
+$runAsUserName = ''
+if ($RunAsCurrentUser) { $runAsUserName = [Security.Principal.WindowsIdentity]::GetCurrent().Name }
+Grant-RunnerInstallPermissions -Path $InstallRoot -RunAsUser $runAsUserName
 
 $configDir = Join-Path $InstallRoot 'config'
 Ensure-Directory $configDir

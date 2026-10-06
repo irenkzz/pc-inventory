@@ -14,7 +14,8 @@ class SiteTokenVerifier
     {
         // Header auth is preferred; query-string fallback is kept for backward compatibility.
         $siteId = trim((string) ($request->header('X-Site-Id') ?: $request->query('site_id', '')));
-        $token = trim((string) ($request->header('X-Site-Token') ?: $request->query('site_token', '')));
+        $token = trim((string) ($request->header('X-Site-Token')
+            ?: (config('inventory.allow_query_site_token', true) ? $request->query('site_token', '') : '')));
         $records = $this->tokens->records();
 
         if ($records === []) {

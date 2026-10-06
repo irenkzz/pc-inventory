@@ -78,11 +78,18 @@ class CommandQueueService
         return $command->refresh();
     }
 
-    public function acknowledge(int $commandId, string $status, string $message = ''): ?RunnerCommand
+    public function acknowledge(int $commandId, string $status, string $message = '', ?string $siteId = null): ?RunnerCommand
     {
-        $command = RunnerCommand::query()->find($commandId);
+        $command = RunnerCommand::query()
+            ->when(($siteId ?? '') !== '', fn ($q) => $q->where('site_id', $siteId))
+            ->find($commandId);
         if ($command === null) {
             return null;
+        }
+
+        // Already finished by a real ACK: keep the first result (superseded is not a runner result).
+        if ($command->completed_at !== null && $command->status !== 'superseded') {
+            return $command;
         }
 
         $completionStatus = $this->normalizer->normalizeWhitespace($status) ?: 'completed';

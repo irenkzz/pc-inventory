@@ -16,10 +16,10 @@ class RunnerReadController extends Controller
             ->withCount(['commands as pending_command_count' => fn ($builder) => $builder->whereIn('status', ['pending', 'dispatched'])])
             ->when($query !== '', function ($builder) use ($query): void {
                 $like = "%{$query}%";
-                $builder->where('runner_id', 'like', $like)
+                $builder->where(fn ($q) => $q->where('runner_id', 'like', $like)
                     ->orWhere('hostname', 'like', $like)
                     ->orWhere('site_id', 'like', $like)
-                    ->orWhere('runner_version', 'like', $like);
+                    ->orWhere('runner_version', 'like', $like));
             })
             ->orderByDesc('last_seen_at')
             ->limit(500)

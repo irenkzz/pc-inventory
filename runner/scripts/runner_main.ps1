@@ -4,6 +4,13 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+}
+catch {
+    # Best effort for Windows PowerShell 5.1.
+}
+
 function Read-JsonFile {
     param([string]$Path)
     if (-not (Test-Path $Path)) { return $null }
@@ -16,7 +23,9 @@ function Write-JsonFile {
     if ($dir -and -not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
-    $Value | ConvertTo-Json -Depth 8 | Set-Content -Path $Path -Encoding UTF8
+    $tmp = $Path + '.tmp'
+    $Value | ConvertTo-Json -Depth 8 | Set-Content -Path $tmp -Encoding UTF8
+    Move-Item -Path $tmp -Destination $Path -Force
 }
 
 function Ensure-Directory {
@@ -858,14 +867,11 @@ function Start-LocalApplyUpdate {
         throw "Package bootstrap updater not found: $packageBootstrapUpdater"
     }
 
-    $baseStagingRoot = if ($env:PUBLIC) {
-        Join-Path $env:PUBLIC 'InternalInventoryRunnerUpdate'
-    } else {
-        Join-Path $RunnerRoot 'update-staging'
-    }
+    # Staging lives under the ACL-protected install root (not world-writable PUBLIC).
+    $baseStagingRoot = Join-Path $RunnerRoot 'update-staging'
     Ensure-Directory $baseStagingRoot
     $stagingRoot = Join-Path $baseStagingRoot 'current'
-    Copy-DirectoryMirror -Source $packageRoot -Destination $stagingRoot
+    Copy-DirectoryMirror -Source $packageRoot -Destination $stagingRoot   # removes then recreates clean
 
     $localBootstrapUpdater = Join-Path $stagingRoot 'scripts\bootstrap_update_runner.ps1'
     if (-not (Test-Path $localBootstrapUpdater)) {
@@ -873,10 +879,15 @@ function Start-LocalApplyUpdate {
     }
 
     $taskName = 'InternalInventoryRunner-ApplyUpdate'
-    $launcherPath = Join-Path $RunnerRoot 'state\apply-update-runner.ps1'
+    # Launcher also lives in the protected staging dir (SYSTEM runs it), not in user-writable state\.
+    $launcherPath = Join-Path $baseStagingRoot 'apply-update-runner.ps1'
+    $qBootstrap = $localBootstrapUpdater -replace "'", "''"
+    $qRoot = $RunnerRoot -replace "'", "''"
+    $qStaging = $stagingRoot -replace "'", "''"
+    $qVersion = $ExpectedVersion -replace "'", "''"
     $launcherScript = @"
 Start-Sleep -Seconds 10
-& '$localBootstrapUpdater' -RunnerRoot '$RunnerRoot' -PackageRoot '$stagingRoot' -ExpectedVersion '$ExpectedVersion' -RunAfterUpdate -NoElevate
+& '$qBootstrap' -RunnerRoot '$qRoot' -PackageRoot '$qStaging' -ExpectedVersion '$qVersion' -RunAfterUpdate -NoElevate
 "@
     Set-Content -Path $launcherPath -Value $launcherScript -Encoding UTF8
 
@@ -953,6 +964,25 @@ Ensure-Directory $stateDir
 Ensure-Directory $dataDir
 Ensure-Directory $logsDir
 $script:RunnerLogPath = Join-Path $logsDir 'runner-main.log'
+
+# Overlap protection: only one runner process at a time (scheduled + startup + manual runs).
+$runMutex = New-Object System.Threading.Mutex($false, 'Global\InternalInventoryRunner')
+$mutexAcquired = $false
+try {
+    $mutexAcquired = $runMutex.WaitOne(0)
+}
+catch [System.Threading.AbandonedMutexException] {
+    $mutexAcquired = $true   # previous owner died; we now own it
+}
+catch [System.UnauthorizedAccessException] {
+    $mutexAcquired = $false  # held by another account's instance
+}
+if (-not $mutexAcquired) {
+    Write-RunnerLog 'Another runner instance is already running; exiting.'
+    $runMutex.Dispose()
+    exit 0
+}
+try {
 
 $statePath = Join-Path $stateDir 'runner-state.json'
 $state = Read-JsonFile -Path $statePath
@@ -1307,3 +1337,8 @@ catch {
 }
 
 exit 0
+}
+finally {
+    $runMutex.ReleaseMutex()
+    $runMutex.Dispose()
+}

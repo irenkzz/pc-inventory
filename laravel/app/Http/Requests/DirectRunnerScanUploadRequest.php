@@ -15,7 +15,7 @@ class DirectRunnerScanUploadRequest extends FormRequest
     {
         return [
             'metadata' => ['required', 'string'],
-            'file' => ['required', 'file'],
+            'file' => ['required', 'file', 'max:' . (int) config('inventory.max_upload_kb', 5120)],
         ];
     }
 }

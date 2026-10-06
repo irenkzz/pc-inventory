@@ -28,7 +28,7 @@ class InventoryIntakeController extends Controller
         $this->checkCentralToken($request);
 
         $request->validate([
-            'file' => ['required', 'file'],
+            'file' => ['required', 'file', 'max:' . (int) config('inventory.max_upload_kb', 5120)],
         ]);
 
         $file = $request->file('file');

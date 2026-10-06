@@ -29,7 +29,7 @@ class CollectorIntakeController extends Controller
     {
         $siteId = $this->siteTokenVerifier->verify($request);
         $payload = $request->validated();
-        $payload['site_id'] = $payload['site_id'] ?? $siteId;
+        $payload['site_id'] = $this->verifiedSite($siteId, $payload['site_id'] ?? null);
 
         $this->collectorStatus->upsert($payload);
 
@@ -40,7 +40,7 @@ class CollectorIntakeController extends Controller
     {
         $siteId = $this->siteTokenVerifier->verify($request);
         $payload = $request->validated();
-        $payload['site_id'] = $payload['site_id'] ?? $siteId;
+        $payload['site_id'] = $this->verifiedSite($siteId, $payload['site_id'] ?? null);
 
         $this->runnerStatus->upsert($payload);
 
@@ -51,7 +51,7 @@ class CollectorIntakeController extends Controller
     {
         $siteId = $this->siteTokenVerifier->verify($request);
         $request->validate([
-            'file' => ['required', 'file'],
+            'file' => ['required', 'file', 'max:' . (int) config('inventory.max_upload_kb', 5120)],
         ]);
 
         $file = $request->file('file');
@@ -88,19 +88,35 @@ class CollectorIntakeController extends Controller
 
     public function acknowledge(CommandAckRequest $request): JsonResponse
     {
-        $this->siteTokenVerifier->verify($request);
+        $siteId = $this->siteTokenVerifier->verify($request);
         $payload = $request->validated();
 
-        $this->commands->acknowledge(
+        $command = $this->commands->acknowledge(
             (int) $payload['command_id'],
             (string) ($payload['status'] ?? 'completed'),
             (string) ($payload['message'] ?? ''),
+            $siteId,
         );
+        abort_if($command === null, 404);
 
         if (isset($payload['runner_state']) && is_array($payload['runner_state'])) {
+            $payload['runner_state']['site_id'] = $this->verifiedSite($siteId, $payload['runner_state']['site_id'] ?? null);
             $this->runnerStatus->upsert($payload['runner_state']);
         }
 
         return response()->json(['status' => 'ok']);
+    }
+
+    /** The token-verified site always wins; a conflicting payload site_id is rejected. */
+    private function verifiedSite(string $siteId, mixed $payloadSite): string
+    {
+        $payloadSite = trim((string) $payloadSite);
+        // Open mode (no tokens configured) has no verified site to enforce.
+        if ($siteId === '') {
+            return $payloadSite;
+        }
+        abort_if($payloadSite !== '' && $payloadSite !== $siteId, 403);
+
+        return $siteId;
     }
 }

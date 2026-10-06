@@ -186,6 +186,16 @@ class ProductionReadiness extends Command
             $this->warnLine('Site token metadata could not be safely queried');
         }
 
+        config('inventory.require_site_tokens')
+            ? $this->ok('INVENTORY_REQUIRE_SITE_TOKENS is true')
+            : $this->warnLine('INVENTORY_REQUIRE_SITE_TOKENS is false (collector/direct intake is open when no tokens are loaded)');
+        trim((string) config('inventory.central_intake_token', '')) !== ''
+            ? $this->ok('INVENTORY_CENTRAL_INTAKE_TOKEN is set')
+            : $this->warnLine('INVENTORY_CENTRAL_INTAKE_TOKEN is empty (/api/intake/* is unauthenticated)');
+        if (config('app.env') === 'production' && config('inventory.allow_query_site_token', true)) {
+            $this->warnLine('INVENTORY_ALLOW_QUERY_SITE_TOKEN is true (site tokens accepted in URLs)');
+        }
+
         $this->warnLine('Token rotation UI not done');
         $this->warnLine('Per-runner token enrollment not done');
         $this->warnLine('Advanced rate limiting not done');

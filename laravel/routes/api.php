@@ -23,10 +23,13 @@ use Illuminate\Support\Facades\Route;
 Route::post('/intake/json', [InventoryIntakeController::class, 'json']);
 Route::post('/intake/csv', [InventoryIntakeController::class, 'csv']);
 
-Route::get('/devices', [DeviceReadController::class, 'index']);
-Route::get('/devices/{device}', [DeviceReadController::class, 'show']);
-Route::get('/runners', [RunnerReadController::class, 'index']);
-Route::get('/runners/{runner}', [RunnerReadController::class, 'show']);
+// Unused by runner/collector; portal-session only ('web' provides the session the 'auth' guard needs).
+Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::get('/devices', [DeviceReadController::class, 'index']);
+    Route::get('/devices/{device}', [DeviceReadController::class, 'show']);
+    Route::get('/runners', [RunnerReadController::class, 'index']);
+    Route::get('/runners/{runner}', [RunnerReadController::class, 'show']);
+});
 
 Route::post('/collector/status', [CollectorIntakeController::class, 'status']);
 Route::post('/collector/heartbeat', [CollectorIntakeController::class, 'heartbeat']);

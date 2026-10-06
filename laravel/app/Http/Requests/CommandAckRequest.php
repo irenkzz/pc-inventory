@@ -15,7 +15,7 @@ class CommandAckRequest extends FormRequest
     {
         return [
             'command_id' => ['required', 'integer', 'min:1'],
-            'status' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'in:completed,succeeded,failed'],
             'message' => ['nullable', 'string'],
             'runner_state' => ['nullable', 'array'],
         ];

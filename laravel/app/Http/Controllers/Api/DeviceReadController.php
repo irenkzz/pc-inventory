@@ -15,12 +15,12 @@ class DeviceReadController extends Controller
         $devices = Device::query()
             ->when($query !== '', function ($builder) use ($query): void {
                 $like = "%{$query}%";
-                $builder->where('current_asset_code', 'like', $like)
+                $builder->where(fn ($q) => $q->where('current_asset_code', 'like', $like)
                     ->orWhere('current_user_name', 'like', $like)
                     ->orWhere('manufacturer', 'like', $like)
                     ->orWhere('model', 'like', $like)
                     ->orWhere('current_location', 'like', $like)
-                    ->orWhere('current_site', 'like', $like);
+                    ->orWhere('current_site', 'like', $like));
             })
             ->orderByDesc('last_seen_at')
             ->orderByDesc('id')
