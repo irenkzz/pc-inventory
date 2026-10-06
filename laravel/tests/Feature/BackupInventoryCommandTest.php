@@ -45,6 +45,58 @@ class BackupInventoryCommandTest extends TestCase
         $this->assertSame(1, $manifest['counts']['raw_files']);
     }
 
+    private function useFakeMysql(): void
+    {
+        Config::set('database.connections.mysqlfake', [
+            'driver' => 'mariadb', 'host' => 'h', 'port' => '3306', 'database' => 'inv', 'username' => 'u', 'password' => 'S3cretPw!',
+        ]);
+        Config::set('database.default', 'mysqlfake');
+        Config::set('inventory.backups_path', 'framework/testing/backups-mysql');
+    }
+
+    public function test_mysqldump_success_keeps_password_out_of_argv(): void
+    {
+        $this->useFakeMysql();
+        $seen = new \ArrayObject();
+        app()->bind('inventory.mysqldump_runner', fn () => function (array $cmd, array $env) use ($seen): array {
+            $seen->exchangeArray([$cmd, $env]);
+            foreach ($cmd as $arg) {
+                if (str_starts_with($arg, '--result-file=')) {
+                    file_put_contents(substr($arg, 14), '-- dump');
+                }
+            }
+
+            return [0, ''];
+        });
+
+        $dir = storage_path('app/framework/testing/backups-mysql/x');
+        File::ensureDirectoryExists($dir);
+        $m = new \ReflectionMethod(\App\Console\Commands\BackupInventory::class, 'backupDatabase');
+        $path = $m->invoke(app(\App\Console\Commands\BackupInventory::class), $dir);
+
+        $this->assertFileExists($path);
+        $this->assertStringNotContainsString('S3cretPw!', implode(' ', $seen[0]));
+        $this->assertSame('S3cretPw!', $seen[1]['MYSQL_PWD']);
+        $this->assertContains('--single-transaction', $seen[0]);
+        $this->assertContains('--no-tablespaces', $seen[0]);
+    }
+
+    public function test_mysqldump_failure_reports_fail_without_secret(): void
+    {
+        $this->useFakeMysql();
+        app()->bind('inventory.mysqldump_runner', fn () => fn (array $cmd, array $env): array => [2, 'Access denied S3cretPw!']);
+        $this->withoutMockingConsoleOutput();
+
+        $buffer = new BufferedOutput();
+        $exit = Artisan::call('inventory:backup', ['--label' => 'f'], $buffer);
+        $output = $buffer->fetch();
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('FAIL', $output);
+        $this->assertStringNotContainsString('S3cretPw!', $output);
+        $this->assertStringNotContainsString('manifest', $output);
+    }
+
     public function test_backup_can_include_downloads_site_tokens_and_prune_old_backups(): void
     {
         Config::set('inventory.backups_path', 'framework/testing/backups-extended');

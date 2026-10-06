@@ -28,6 +28,14 @@ class Kernel extends ConsoleKernel
                 ->dailyAt((string) config('inventory.backup_schedule_time', '01:30'))
                 ->withoutOverlapping();
         }
+
+        if ((bool) config('inventory.retention.schedule_enabled')) {
+            $schedule->command('inventory:prune --force')->dailyAt('03:15')->withoutOverlapping();
+        }
+
+        if ((bool) config('inventory.schedule_doctor')) {
+            $schedule->command('inventory:doctor')->daily()->withoutOverlapping();
+        }
     }
 
     /**
