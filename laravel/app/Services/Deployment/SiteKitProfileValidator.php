@@ -37,6 +37,11 @@ class SiteKitProfileValidator
     {
     }
 
+    public static function isValidSiteId(string $siteId): bool
+    {
+        return preg_match('/^[A-Z0-9][A-Z0-9_-]*$/', $siteId) === 1;
+    }
+
     public function load(string $path): array
     {
         $resolved = $this->resolvePath($path);
@@ -91,7 +96,7 @@ class SiteKitProfileValidator
         }
 
         $siteId = trim((string) ($profile['site_id'] ?? ''));
-        if ($siteId !== '' && ! preg_match('/^[A-Z0-9][A-Z0-9_-]*$/', $siteId)) {
+        if ($siteId !== '' && ! self::isValidSiteId($siteId)) {
             $errors[] = 'site_id should use uppercase letters, numbers, underscore, or dash';
         }
 

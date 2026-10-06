@@ -144,6 +144,68 @@ class SiteTokenStore
         return true;
     }
 
+    public function isReadOnly(): bool
+    {
+        return trim((string) config('inventory.site_tokens_json', '')) !== '';
+    }
+
+    public function hasSite(string $siteId): bool
+    {
+        foreach ($this->records() as $record) {
+            if ($record['site_id'] === $siteId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Rename a site key for all token types in the JSON file store, keeping every record field.
+     * Returns the number of token records renamed. Atomic: temp file + rename.
+     *
+     * @throws \RuntimeException when the store is env-based, missing, unwritable or the write fails
+     */
+    public function renameSite(string $old, string $new): int
+    {
+        $path = $this->filePath();
+        if ($this->isReadOnly() || $path === '' || ! is_file($path) || ! is_writable($path)) {
+            throw new \RuntimeException('Token store is not a writable JSON file.');
+        }
+
+        $raw = json_decode((string) file_get_contents($path), true);
+        if (! is_array($raw)) {
+            throw new \RuntimeException('Token file is not valid JSON.');
+        }
+
+        $count = count(array_filter($this->records(), fn (array $r): bool => $r['site_id'] === $old));
+        if ($count === 0) {
+            return 0;
+        }
+
+        $out = [];
+        foreach ($raw as $key => $value) {
+            if (is_int($key) && is_array($value)) {
+                if (trim((string) ($value['site_id'] ?? '')) === $old) {
+                    $value['site_id'] = $new;
+                }
+                $out[] = $value;
+            } elseif (trim((string) $key) === $old) {
+                $out[$new] = $value;
+            } else {
+                $out[$key] = $value;
+            }
+        }
+
+        $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
+        if (file_put_contents($tmp, json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false || ! rename($tmp, $path)) {
+            @unlink($tmp);
+            throw new \RuntimeException('Could not write token file.');
+        }
+
+        return $count;
+    }
+
     private function typeOf(array $entry): string
     {
         return trim((string) ($entry['token_type'] ?? '')) ?: self::TYPE_COLLECTOR;
