@@ -129,6 +129,22 @@ $config = [ordered]@{
     taskRandomDelayMinutes = $TaskRandomDelayMinutes
     runAsCurrentUser = [bool]$RunAsCurrentUser
 }
+# Signed-update trust anchor: the kit's public key was copied above with the rest of SourceRoot (config\).
+# Its presence means this kit was built with a signing key, so enforce signed updates.
+# The anchor lives in <root>\trust (admin-only ACL), not config\ (writable by the task user in current-user mode).
+$kitKey = Join-Path $configDir 'update-public-key.xml'
+$trustDir = Join-Path $InstallRoot 'trust'
+$trustKey = Join-Path $trustDir 'update-public-key.xml'
+if (Test-Path $kitKey) {
+    Ensure-Directory $trustDir
+    Copy-Item -Path $kitKey -Destination $trustKey -Force   # copy (not move) so the file inherits the trust\ ACL
+    Remove-Item -Path $kitKey -Force
+}
+if (Test-Path $trustKey) {
+    $config['requireSignedUpdates'] = $true
+} elseif ($existingConfig -and $existingConfig.PSObject.Properties.Name -contains 'requireSignedUpdates') {
+    $config['requireSignedUpdates'] = [bool]$existingConfig.requireSignedUpdates
+}
 $config | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $configDir 'runner-config.json') -Encoding UTF8
 
 $scriptPath = Join-Path $InstallRoot 'scripts\runner_main.ps1'

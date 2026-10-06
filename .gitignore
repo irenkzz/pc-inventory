@@ -31,6 +31,8 @@ laravel/storage/app/inventory/raw_archive/
 laravel/storage/app/inventory/backups/
 laravel/storage/app/inventory/site_kits/
 laravel/storage/app/inventory/generated/
+laravel/storage/app/inventory/keys/
+*.pem
 
 # =========================
 # Generated deployment/site-kit artifacts

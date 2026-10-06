@@ -923,6 +923,38 @@ function Start-LocalApplyUpdate {
         throw "Local staged bootstrap updater not found: $localBootstrapUpdater"
     }
 
+    # Integrity gate: verify the staged copy (the share can no longer change it) BEFORE anything runs as SYSTEM.
+    # Policy: key present -> must verify; requireSignedUpdates=true -> key + valid signature mandatory;
+    # no key and not required -> allow with warning (already-deployed runners, backward compat).
+    $publicKeyPath = Join-Path $RunnerRoot 'trust\update-public-key.xml'
+    $requireSigned = [bool](Get-JsonValue -Object $config -Name 'requireSignedUpdates' -Default $false)
+    $keyPresent = Test-Path -LiteralPath $publicKeyPath -PathType Leaf
+    $verifierPath = Join-Path $PSScriptRoot 'verify_update_package.ps1'
+    $rejectReason = ''
+    if ($keyPresent -or $requireSigned) {
+        if (-not $keyPresent) {
+            $rejectReason = 'public key not installed'
+        } elseif (-not (Test-Path -LiteralPath $verifierPath)) {
+            $rejectReason = 'verifier script missing'
+        } else {
+            . $verifierPath
+            $verdict = Test-RunnerUpdatePackage -PackageRoot $stagingRoot -PublicKeyXmlPath $publicKeyPath
+            if (-not $verdict.Ok) { $rejectReason = [string]$verdict.Reason }
+        }
+    } else {
+        Write-RunnerLog 'WARNING: no update public key installed and requireSignedUpdates is not set; applying UNVERIFIED update package.'
+    }
+    if ($rejectReason) {
+        Write-RunnerLog "Update package rejected: $rejectReason"
+        Remove-Item -LiteralPath $stagingRoot -Recurse -Force -ErrorAction SilentlyContinue
+        $State.last_inventory_status = 'update_rejected'
+        $State.last_upload_status = 'update_rejected'
+        $State.last_error = 'update package signature invalid'
+        $State.last_command_type = if ($PendingCommand) { [string]$PendingCommand.command_type } else { 'manifest_update' }
+        Write-CommandAck -SharedRoot $SharedRoot -State $State -PendingCommand $PendingCommand -Status 'failed' -Message 'update package signature invalid'
+        return
+    }
+
     $taskName = 'InternalInventoryRunner-ApplyUpdate'
     # Launcher also lives in the protected staging dir (SYSTEM runs it), not in user-writable state\.
     $launcherPath = Join-Path $baseStagingRoot 'apply-update-runner.ps1'
@@ -1303,6 +1335,9 @@ try {
         }
 
         Start-LocalApplyUpdate -RunnerRoot $runnerRoot -SharedRoot $sharedRoot -ExpectedVersion $expectedVersion -State $state -PendingCommand $pendingCommand
+        if ([string]$state.last_inventory_status -eq 'update_rejected' -and $commandPath -and (Test-Path $commandPath)) {
+            Remove-Item -Path $commandPath -Force -ErrorAction SilentlyContinue   # failed ACK written; do not redeliver
+        }
 
         Write-JsonFile -Path $statePath -Value $state
         Sync-StateToBranchShare -SharedRoot $sharedRoot -RunnerId $runnerId -StatePath $statePath -State $state
