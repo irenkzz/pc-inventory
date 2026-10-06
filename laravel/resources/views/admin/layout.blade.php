@@ -398,6 +398,7 @@
 
         th,
         td {
+            overflow-wrap: break-word;
             border-bottom: 1px solid var(--border-soft);
             padding: 12px 14px;
             text-align: left;
@@ -722,6 +723,7 @@
 
         .entity-subtitle {
             display: block;
+            overflow-wrap: anywhere;
             margin-top: 2px;
             color: var(--muted);
             font-size: 12px;
@@ -894,6 +896,23 @@
             overflow: auto;
         }
 
+        a:focus-visible,
+        button:focus-visible,
+        .btn:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        summary:focus-visible,
+        .pagination-link:focus-visible {
+            outline: 2px solid var(--blue);
+            outline-offset: 2px;
+        }
+
+        header a:focus-visible,
+        header button:focus-visible,
+        header summary:focus-visible {
+            outline-color: #fff;
+        }
+
         @media (max-width: 980px) {
             .topbar {
                 grid-template-columns: 1fr;
@@ -948,6 +967,9 @@
             .page-shell { padding: 22px 16px 32px; }
             .topbar { padding: 12px 16px; }
             h2 { font-size: 24px; }
+            input[type=text],
+            input[type=date],
+            select { font-size: 16px; }
             dl { grid-template-columns: 1fr; }
             dt { border-bottom: 0; }
         }
@@ -1046,5 +1068,24 @@
     @endif
     @yield('content')
 </main>
+<script>
+    // Block double-submit on POST forms; re-enable after 8s (file downloads never navigate away) and on back-forward restore.
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (e.defaultPrevented || String(form.method).toLowerCase() !== 'post') return;
+        setTimeout(function () {
+            form.querySelectorAll('button[type=submit], button:not([type])').forEach(function (b) {
+                if (b.disabled) return;
+                b.disabled = true;
+                b.dataset.locked = '1';
+                setTimeout(function () { b.disabled = false; delete b.dataset.locked; }, 8000);
+            });
+        }, 0);
+    });
+    window.addEventListener('pageshow', function (e) {
+        if (!e.persisted) return;
+        document.querySelectorAll('button[data-locked]').forEach(function (b) { b.disabled = false; delete b.dataset.locked; });
+    });
+</script>
 </body>
 </html>
