@@ -31,6 +31,11 @@ Assert-True ($text.Contains('$ConfigPath = Join-Path $InstalledRoot')) 'switches
 Assert-True ($text.Contains("'*S-1-5-32-544:(OI)(CI)F'")) 'locks the folder (site token) to Administrators and SYSTEM'
 Assert-True (-not $text.Contains('/grant ''*S-1-5-32-545')) 'does not grant Users access to the collector folder'
 
+# schtasks quoting: a Python path with spaces must survive Windows PowerShell 5.1 argument passing.
+Assert-True ($text.Contains("`$taskRunArg = '`"' + (`$taskRun -replace '`"', '\`"') + '`"'")) 'escapes inner quotes of the task command line'
+Assert-True (-not $text.Contains('/TR $taskRun ')) 'schtasks always receives the escaped task command line'
+Assert-True ([regex]::Matches($text, '/TR \$taskRunArg ').Count -eq 4) 'all four schtasks calls use the escaped command line'
+
 # Ordering: the copy must happen before the task command line is built from CollectorRoot.
 $copyAt = $text.IndexOf('$CollectorRoot = $InstalledRoot')
 $launcherAt = $text.IndexOf('$hiddenLauncherPath = Join-Path $CollectorRoot')
