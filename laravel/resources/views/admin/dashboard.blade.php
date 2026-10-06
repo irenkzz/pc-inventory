@@ -179,10 +179,10 @@
                                 <td>{{ $runner->site?->site_name ?: ($runner->site_id ?: '-') }}</td>
                                 <td>{{ $runner->runner_version ?: '-' }}</td>
                                 <td>@inventoryTime($runner->last_seen_at)</td>
-                                <td>@inventoryTime($runner->last_successful_inventory_at)</td>
+                                <td>@inventoryTime(($runner->transport_mode === 'direct_https' && $runner->last_direct_upload_at) ? $runner->last_direct_upload_at : $runner->last_successful_inventory_at)</td>
                                 <td>
                                     <span class="badge {{ $statusClass }}"><span class="status-dot"></span>{{ $statusLabel }}</span>
-                                    <div class="summary-meta">{{ $runner->last_inventory_status ?: '-' }} / {{ $runner->last_upload_status ?: '-' }}</div>
+                                    <div class="summary-meta">{{ $runner->last_inventory_status ?: ($runner->last_direct_upload_at && $runner->transport_mode === 'direct_https' ? 'success' : '-') }} / {{ $runner->last_upload_status ?: ($runner->last_direct_upload_at && $runner->transport_mode === 'direct_https' ? 'uploaded' : '-') }}</div>
                                 </td>
                             </tr>
                         @empty
