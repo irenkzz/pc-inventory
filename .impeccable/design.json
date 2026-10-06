@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T00:00:00Z",
+  "title": "Design System: Inventory Admin Portal",
+  "extensions": {
+    "colorMeta": {
+      "signal-blue": {
+        "role": "primary",
+        "displayName": "Signal Blue",
+        "canonical": "#1d4ed8"
+      },
+      "brand-teal": {
+        "role": "secondary",
+        "displayName": "Brand Teal",
+        "canonical": "#164e63"
+      },
+      "ok-green": {
+        "role": "tertiary",
+        "displayName": "Ok Green",
+        "canonical": "#047857"
+      },
+      "warn-amber": {
+        "role": "tertiary",
+        "displayName": "Warn Amber",
+        "canonical": "#b45309"
+      },
+      "danger-red": {
+        "role": "tertiary",
+        "displayName": "Danger Red",
+        "canonical": "#b42318"
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "canonical": "#f4f6f8"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#182230"
+      },
+      "ok-green-soft": {
+        "role": "neutral",
+        "displayName": "Ok Green Soft",
+        "canonical": "#e8f7ef"
+      },
+      "danger-red-soft": {
+        "role": "neutral",
+        "displayName": "Danger Red Soft",
+        "canonical": "#fff0ed"
+      },
+      "code-night": {
+        "role": "neutral",
+        "displayName": "Code Night",
+        "canonical": "#101828"
+      },
+      "nav-night": {
+        "role": "neutral",
+        "displayName": "Nav Night",
+        "canonical": "#0f172a"
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Title",
+        "purpose": "Page h2."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section h3."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Table cells and paragraphs."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase table headers and metric labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel-rest",
+        "value": "0 1px 2px rgba(16,24,40,.04)",
+        "purpose": "Panels, tables, metrics."
+      },
+      {
+        "name": "header",
+        "value": "0 10px 24px rgba(15,23,42,.18)",
+        "purpose": "Sticky top bar."
+      },
+      {
+        "name": "floating-menu",
+        "value": "0 18px 40px rgba(15,23,42,.28)",
+        "purpose": "Nav dropdown."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "tablet",
+        "value": "980px"
+      },
+      {
+        "name": "phone",
+        "value": "700px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action in a panel or form.",
+      "html": "<button class=\"ds-btn\">Manual scan</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;min-height:38px;padding:9px 13px;border:1px solid transparent;border-radius:8px;background:#1d4ed8;color:#fff;font:inherit;font-size:14px;font-weight:750;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.08)}.ds-btn:hover{filter:brightness(.96)}.ds-btn:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Non-primary action.",
+      "html": "<button class=\"ds-btn-2\">Cancel</button>",
+      "css": ".ds-btn-2{display:inline-flex;align-items:center;min-height:38px;padding:9px 13px;border:1px solid #344054;border-radius:8px;background:#344054;color:#fff;font:inherit;font-size:14px;font-weight:750;cursor:pointer}.ds-btn-2:hover{filter:brightness(.96)}.ds-btn-2:focus-visible{outline:2px solid #344054;outline-offset:2px}"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "badge-good",
+      "description": "Soft-fill pill with text label for each state.",
+      "html": "<span class=\"ds-b good\">success</span> <span class=\"ds-b warn\">stale</span> <span class=\"ds-b danger\">failed</span>",
+      "css": ".ds-b{display:inline-flex;align-items:center;min-height:24px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}.ds-b.good{color:#047857;background:#e8f7ef}.ds-b.warn{color:#b45309;background:#fff4df}.ds-b.danger{color:#b42318;background:#fff0ed}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Search and filter field.",
+      "html": "<input class=\"ds-in\" type=\"text\" placeholder=\"Search runner\">",
+      "css": ".ds-in{min-height:38px;width:240px;max-width:100%;padding:8px 10px;border:1px solid #c9d3df;border-radius:8px;background:#fff;color:#182230;font:inherit;font-size:14px}.ds-in:focus-visible{outline:2px solid #1d4ed8;outline-offset:1px}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "White container with title row.",
+      "html": "<div class=\"ds-p\"><h4>Recent Runner Health</h4><p>Last 5 reports</p></div>",
+      "css": ".ds-p{padding:18px;background:#fff;border:1px solid #e8edf3;border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,.04);font-family:Inter,system-ui,sans-serif}.ds-p h4{margin:0;font-size:16px;color:#182230}.ds-p p{margin:4px 0 0;font-size:13px;color:#667085}"
+    },
+    {
+      "name": "Flash Banners",
+      "kind": "custom",
+      "refersTo": "badge-good",
+      "description": "Notice and error banners.",
+      "html": "<div class=\"ds-n\">Saved.</div><div class=\"ds-e\">Token revoked failed.</div>",
+      "css": ".ds-n,.ds-e{padding:12px 14px;margin-bottom:8px;border-radius:8px;font-size:14px;font-family:Inter,system-ui,sans-serif}.ds-n{background:#e8f7ef;border:1px solid #a7f3d0;color:#065f46}.ds-e{background:#fff0ed;border:1px solid #fecaca;color:#7f1d1d}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Control Room Ledger",
+    "overview": "A quiet, light-surfaced ledger under a dark navigation bar. Rows, counts, and status chips carry the interface; decoration does not. Components are calm and friendly: soft 8px corners, generous padding inside dense layouts, soft-tinted status fills.",
+    "keyCharacteristics": [
+      "Cool-gray canvas, white panels, 1px hairline borders, 8px corners everywhere",
+      "Dark slate top navigation with grouped dropdown menus",
+      "Semantic soft-fill badges for every status",
+      "One font family (Inter, system fallback)"
+    ],
+    "rules": [
+      {
+        "name": "The Signal Only Rule",
+        "body": "Green, amber, and red appear only to report state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Soft Fill Rule",
+        "body": "A status is a dark text tone on its own soft tint, always with a text label.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Do not introduce a second typeface.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Content Rule",
+        "body": "Content panels never gain a larger shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do express status as a soft-fill badge with a text label.",
+      "Do keep every container at 8px radius and 1px hairline borders.",
+      "Do add a visible :focus-visible outline to new interactive elements."
+    ],
+    "donts": [
+      "Don't use green, amber, or red as decoration.",
+      "Don't add a second typeface, gradients, or large shadows on content panels.",
+      "Don't use color alone to convey state.",
+      "Don't copy auth/login.blade.php styling; it has drifted from the system."
+    ]
+  }
+}
