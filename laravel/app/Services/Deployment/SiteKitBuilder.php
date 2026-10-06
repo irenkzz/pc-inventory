@@ -461,7 +461,7 @@ class SiteKitBuilder
             . "UseLongFileName=1\r\nInsertReboot=0\r\nRebootMode=N\r\nCheckAdminRights=0\r\n"
             . "FinishMessage=\r\nInstallPrompt=\r\nDisplayLicense=\r\n"
             . "TargetName={$targetExe}\r\nFriendlyName=Inventory runner setup {$siteId}\r\n"
-            . "AppLaunched=cmd /c {$wrapperName}\r\nPostInstallCmd=<None>\r\nAdminQuietInstCmd=\r\nUserQuietInstCmd=\r\n"
+            . "AppLaunched=cmd /c .\\{$wrapperName}\r\nPostInstallCmd=<None>\r\nAdminQuietInstCmd=\r\nUserQuietInstCmd=\r\n"
             . "SourceFiles=SourceFiles\r\n"
             . "[Strings]\r\nFILE0=\"{$wrapperName}\"\r\nFILE1=\"{$zipName}\"\r\n"
             . "[SourceFiles]\r\nSourceFiles0={$sourceDir}\r\n"
