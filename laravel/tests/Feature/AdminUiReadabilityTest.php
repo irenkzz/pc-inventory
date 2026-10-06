@@ -65,7 +65,7 @@ class AdminUiReadabilityTest extends TestCase
         Runner::query()->create([
             'runner_id' => 'PC-RECENT',
             'hostname' => 'PC-RECENT',
-            'runner_version' => '1.0.21',
+            'runner_version' => config('inventory.runner_target_version'),
             'last_seen_at' => now()->subMinutes(5),
         ]);
 

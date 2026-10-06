@@ -39,4 +39,5 @@
             <tr><td colspan="8">No devices yet.</td></tr>
         @endforelse
     </table>
+    {{ $devices->links() }}
 @endsection

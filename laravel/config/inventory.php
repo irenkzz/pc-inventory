@@ -35,7 +35,11 @@ return [
     'allow_query_site_token' => env('INVENTORY_ALLOW_QUERY_SITE_TOKEN', true),
     'max_upload_kb' => (int) env('INVENTORY_MAX_UPLOAD_KB', 5120),
     'central_intake_token' => env('INVENTORY_CENTRAL_INTAKE_TOKEN'),
-    'runner_target_version' => env('INVENTORY_RUNNER_TARGET_VERSION', '1.0.21'),
+    'runner_target_version' => env('INVENTORY_RUNNER_TARGET_VERSION', '1.0.22'), // keep in sync with runner/manifest/runner-manifest.json runner_version
+    'stale_after_hours' => (int) env('INVENTORY_STALE_AFTER_HOURS', 24),
+    'schedule_stale_check' => env('INVENTORY_SCHEDULE_STALE_CHECK', false),
+    'alert_webhook_url' => env('INVENTORY_ALERT_WEBHOOK_URL'),
+    'alert_cooldown_hours' => (int) env('INVENTORY_ALERT_COOLDOWN_HOURS', 12),
     'direct_command_redelivery_minutes' => env('INVENTORY_DIRECT_COMMAND_REDELIVERY_MINUTES', 3),
     'install_preflight_base_path_override' => env('INVENTORY_INSTALL_PREFLIGHT_BASE_PATH_OVERRIDE'),
     'install_preflight_hostname_override' => env('INVENTORY_INSTALL_PREFLIGHT_HOSTNAME_OVERRIDE'),

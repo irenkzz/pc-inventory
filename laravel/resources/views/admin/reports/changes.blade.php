@@ -43,4 +43,5 @@
             <tr><td colspan="10">No changes yet.</td></tr>
         @endforelse
     </table>
+    {{ $changes->links() }}
 @endsection

@@ -2,6 +2,12 @@
 
 @section('content')
     <h2>Recent Changes</h2>
+    <form method="get" class="actions">
+        <input name="severity" value="{{ $severity }}" placeholder="Severity">
+        <input name="site" value="{{ $site }}" placeholder="Site">
+        <button type="submit">Filter</button>
+        <a class="btn secondary" href="{{ route('admin.changes.index') }}">Reset</a>
+    </form>
     <table>
         <tr><th>Observed</th><th>Asset</th><th>Site</th><th>Severity</th><th>Group</th><th>Field</th><th>Old</th><th>New</th></tr>
         @forelse($changes as $change)
@@ -19,4 +25,5 @@
             <tr><td colspan="8">No changes yet.</td></tr>
         @endforelse
     </table>
+    {{ $changes->links() }}
 @endsection

@@ -42,7 +42,7 @@ class PilotReadinessService
     {
         $freshCutoff = now()->subMinutes($staleMinutes);
         $commandCutoff = now()->subMinutes($commandStaleMinutes);
-        $targetVersion = (string) config('inventory.runner_target_version', '1.0.19');
+        $targetVersion = (string) config('inventory.runner_target_version');
 
         return [
             'collectors_total' => Collector::query()->count(),
