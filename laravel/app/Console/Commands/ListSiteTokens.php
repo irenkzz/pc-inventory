@@ -30,11 +30,14 @@ class ListSiteTokens extends Command
             return self::SUCCESS;
         }
 
-        $this->table(['Site', 'Type', 'Token'], collect($records)
+        $this->table(['Site', 'Type', 'Token', 'Last used', 'Expires', 'Revoked'], collect($records)
             ->map(fn (array $record): array => [
                 $record['site_id'],
                 $record['token_type'],
                 $this->option('reveal') ? $record['token'] : $this->mask($record['token']),
+                $record['last_used_at'] ?? '-',
+                $record['expires_at'] ?? '-',
+                $record['revoked_at'] ?? '-',
             ])
             ->values()
             ->all());

@@ -38,6 +38,10 @@ class User extends Authenticatable
      *
      * @var array<string, string>
      */
+    public const ROLES = ['admin', 'viewer'];
+
+    protected $attributes = ['role' => 'admin'];
+
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
