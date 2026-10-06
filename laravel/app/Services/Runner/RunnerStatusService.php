@@ -64,6 +64,20 @@ class RunnerStatusService
             'raw_state_json' => $payload,
         ];
 
+        // A heartbeat that does not carry these fields (the Direct heartbeat sends no inventory status) must
+        // not blank what an earlier upload already recorded.
+        $existing = Runner::query()->where('runner_id', $runnerId)->first();
+        if ($existing !== null) {
+            foreach (['runner_version', 'last_inventory_status', 'last_upload_status'] as $keep) {
+                if ($attributes[$keep] === '' && (string) $existing->{$keep} !== '') {
+                    $attributes[$keep] = $existing->{$keep};
+                }
+            }
+            if ($attributes['last_successful_inventory_at'] === null) {
+                $attributes['last_successful_inventory_at'] = $existing->last_successful_inventory_at;
+            }
+        }
+
         if (array_key_exists('transport_mode', $payload)) {
             $attributes['transport_mode'] = $this->normalizer->normalizeWhitespace($payload['transport_mode'] ?? '');
         }
