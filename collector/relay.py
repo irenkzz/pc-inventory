@@ -343,14 +343,23 @@ def cmd_init_share(args: argparse.Namespace) -> None:
     print(f"Branch share initialized at: {cfg['share_root']}")
 
 
+def best_effort(label: str, step, default):
+    try:
+        return step()
+    except Exception as exc:
+        print(f"{label} failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return default
+
+
 def cmd_run_once(args: argparse.Namespace) -> None:
     cfg = load_config(args.config)
     ensure_share_layout(cfg["share_root"])
     hb = flush_heartbeats(cfg)
     inv = flush_inventory(cfg)
     ack = flush_command_acks(cfg)
-    cmd = pull_commands(cfg)
-    send_collector_status(cfg)
+    # Best effort: a 429/5xx here (for example while draining a backlog) must not crash the run.
+    cmd = best_effort("pull_commands", lambda: pull_commands(cfg), 0)
+    best_effort("send_collector_status", lambda: send_collector_status(cfg), None)
     print(json.dumps({"heartbeats_sent": hb, "inventory_sent": inv, "command_acks_sent": ack, "commands_pulled": cmd}, indent=2))
 
 

@@ -36,6 +36,7 @@ return [
     'require_site_tokens' => env('INVENTORY_REQUIRE_SITE_TOKENS', false),
     'allow_query_site_token' => env('INVENTORY_ALLOW_QUERY_SITE_TOKEN', true),
     'max_upload_kb' => (int) env('INVENTORY_MAX_UPLOAD_KB', 5120),
+    'api_rate_limit_per_minute' => (int) env('INVENTORY_API_RATE_LIMIT_PER_MINUTE', 60),
     'central_intake_token' => env('INVENTORY_CENTRAL_INTAKE_TOKEN'),
     'runner_target_version' => env('INVENTORY_RUNNER_TARGET_VERSION', '1.0.22'), // keep in sync with runner/manifest/runner-manifest.json runner_version
     'stale_after_hours' => (int) env('INVENTORY_STALE_AFTER_HOURS', 24),

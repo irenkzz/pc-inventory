@@ -136,5 +136,25 @@ class RelayTest(unittest.TestCase):
         self.assertEqual([f.name for f in Path(self.tmp.name).glob("o.json*")], ["o.json"])
 
 
+class RunOnceResilienceTest(unittest.TestCase):
+    def test_429_on_commands_and_status_does_not_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg_path = Path(tmp) / "c.json"
+            cfg_path.write_text(json.dumps({
+                "site_id": "S1", "collector_name": "c", "site_token": "t",
+                "share_root": str(Path(tmp) / "share"), "server_base_url": "https://example.test",
+            }))
+            orig = relay.http_json
+
+            def always_429(*a, **k):
+                raise http_error(429)
+
+            relay.http_json = always_429
+            try:
+                relay.cmd_run_once(type("A", (), {"config": str(cfg_path)})())
+            finally:
+                relay.http_json = orig
+
+
 if __name__ == "__main__":
     unittest.main()
