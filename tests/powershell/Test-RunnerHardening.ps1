@@ -27,6 +27,9 @@ foreach ($pair in @(@('bootstrap', $boot), @('install_runner', $inst))) {
     Assert-True (-not ($pair[1] -match "grant\s+'\*S-1-5-32-545")) "$($pair[0]) does not grant Users on install root"
     Assert-True ($pair[1].Contains('/inheritance:r') -and $pair[1].Contains('S-1-5-32-544')) "$($pair[0]) locks root to Administrators+SYSTEM"
 }
+Assert-True ($main.Contains('next_attempt_at') -and $main.Contains('Get-DirectBackoffDelayMinutes') -and $main.Contains('DirectBackoffCapMinutes = 360')) 'direct outbox has exponential backoff with cap'
+Assert-True ($main.Contains('401, 403') -and $main.Contains('-Longest')) 'direct outbox 401/403 use longest backoff'
+Assert-True ($main.Contains('DirectOutboxMaxPending = 200') -and $main.Contains('Remove-DirectPendingOverflow')) 'direct pending outbox is count-capped'
 Assert-True ($scan.Contains('WaitForExit(30000)')) 'smartctl calls are time-bounded'
 
 foreach ($f in 'runner_main', 'bootstrap_update_runner', 'install_runner', 'scanner_core_v4') {
