@@ -5,6 +5,7 @@ namespace App\Services\Deployment;
 use App\Services\Security\SiteTokenStore;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 use ZipArchive;
 
 class SiteKitBuilder
@@ -491,7 +492,10 @@ class SiteKitBuilder
             if (is_file($exePath)) {
                 File::delete($exePath);
             }
-            exec('"' . $iexpress . '" /N /Q "' . $sedPath . '" 2>&1', $out, $code);
+            // Array command, no shell: exec('"a" /N /Q "b"') goes through cmd /c, which strips the outer quotes and breaks.
+            $process = new Process([$iexpress, '/N', '/Q', $sedPath], null, null, null, 300);
+            $process->run();
+            $code = $process->getExitCode() ?? 1;
         } finally {
             File::deleteDirectory($sedDir);
         }
