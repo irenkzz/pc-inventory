@@ -7,7 +7,9 @@ param(
     [string]$RunnerId = '',
     [switch]$UseComputerNameAsRunnerId,
     [int]$HealthTimeoutSeconds = 20,
-    [switch]$RunAsCurrentUser = $true
+    [switch]$RunAsCurrentUser = $true,
+    [string]$ResultPath = '',
+    [switch]$PauseOnFail
 )
 
 Set-StrictMode -Version Latest
@@ -220,7 +222,18 @@ function Invoke-HealthCheck {
     )
 
     $healthUrl = $ServerBaseUrl.TrimEnd('/') + '/health'
-    $response = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec $TimeoutSeconds
+    try {
+        $response = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec $TimeoutSeconds
+    }
+    catch {
+        $messages = @()
+        for ($ex = $_.Exception; $ex; $ex = $ex.InnerException) { $messages += $ex.Message }
+        if (($messages -join ' | ') -match 'trust relationship|SSL/TLS|secure channel|certificate|AuthenticationException') {
+            $hostName = ([Uri]$ServerBaseUrl).Host
+            throw "Windows does not trust the server certificate for $hostName. Import the internal CA certificate on this PC, then run the installer again."
+        }
+        throw
+    }
     $statusCode = [int]$response.StatusCode
     if ($statusCode -lt 200 -or $statusCode -ge 300) {
         throw "HTTPS health check returned HTTP $statusCode."
@@ -335,6 +348,50 @@ function Invoke-RunnerInstaller {
     }
 }
 
+function ConvertTo-RedactedText {
+    param([string]$Text)
+
+    if ([string]::IsNullOrEmpty($Text)) { return '' }
+    $redacted = [regex]::Replace($Text, '(?i)bearer\s+\S+', 'Bearer ***')
+    return [regex]::Replace($redacted, '[A-Za-z0-9_\-]{32,}', '***')
+}
+
+function Invoke-InitialRunnerScan {
+    param([string]$InstallRoot)
+
+    $runnerScript = Join-Path $InstallRoot 'scripts\runner_main.ps1'
+    if (-not (Test-Path $runnerScript)) {
+        throw "Installed runner script not found: $runnerScript"
+    }
+
+    Write-InstallerLine 'INFO' 'Running initial runner scan and heartbeat...'
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runnerScript 2>&1
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    foreach ($line in $output) {
+        Write-InstallerLine 'INFO' (ConvertTo-RedactedText ([string]$line))
+    }
+
+    $statePath = Join-Path $InstallRoot 'state\runner-state.json'
+    if (-not (Test-Path $statePath)) {
+        throw "Initial runner scan failed: runner state file not found: $statePath"
+    }
+
+    $state = Read-JsonFile -Path $statePath
+    $status = Get-JsonValue -Object $state -Names @('last_inventory_status')
+    if ($status -ne 'success') {
+        $lastError = ConvertTo-RedactedText (Get-JsonValue -Object $state -Names @('last_error') -Default 'No detailed runner error was recorded.')
+        throw "Initial runner scan failed (status '$status'): $lastError"
+    }
+
+    Write-InstallerLine 'OK' 'Initial runner scan and heartbeat succeeded.'
+}
+
 try {
     $script:LogPath = New-InstallerLogPath -InstallRoot $InstallRoot
     '' | Set-Content -Path $script:LogPath -Encoding UTF8
@@ -419,6 +476,8 @@ try {
     }
     Write-InstallerLine 'OK' "Scheduled Task present: $resolvedTaskName"
 
+    Invoke-InitialRunnerScan -InstallRoot $InstallRoot
+
     $runnerVersion = Get-JsonValue -Object $verifiedConfig -Names @('runnerVersion', 'runner_version')
     Write-InstallerLine 'INFO' 'Redacted support summary:'
     Write-InstallerLine 'INFO' "runnerId: $resolvedRunnerId"
@@ -442,8 +501,22 @@ finally {
     Write-InstallerLine '' "Result: $script:Result"
 }
 
-if ($script:Result -eq 'PASS') {
-    exit 0
+$exitCode = if ($script:Result -eq 'PASS') { 0 } else { 1 }
+
+if (-not [string]::IsNullOrWhiteSpace($ResultPath)) {
+    try {
+        @("status=$script:Result", "exitcode=$exitCode", "log=$script:LogPath") |
+            Set-Content -Path $ResultPath -Encoding ASCII
+    }
+    catch {
+        Write-Host "Could not write result file: $ResultPath"
+    }
 }
 
-exit 1
+if ($exitCode -ne 0 -and $PauseOnFail) {
+    Write-Host ''
+    Write-Host "Installer FAILED. Log: $script:LogPath"
+    [void](Read-Host 'Press Enter to close this window')
+}
+
+exit $exitCode

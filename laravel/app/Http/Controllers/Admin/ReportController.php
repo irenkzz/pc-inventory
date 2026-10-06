@@ -29,7 +29,8 @@ class ReportController extends Controller
                 ->orderBy('current_site')
                 ->orderBy('current_department')
                 ->orderBy('current_asset_code')
-                ->get(),
+                ->paginate(100)
+                ->withQueryString(),
             'filters' => $filters,
             'sites' => $this->deviceSites(),
             'departments' => $this->departments(),
@@ -48,8 +49,8 @@ class ReportController extends Controller
                 ->when($filters['date_from'] !== '', fn ($query) => $query->whereDate('observed_at', '>=', $filters['date_from']))
                 ->when($filters['date_to'] !== '', fn ($query) => $query->whereDate('observed_at', '<=', $filters['date_to']))
                 ->orderByDesc('observed_at')
-                ->limit(1000)
-                ->get(),
+                ->paginate(100)
+                ->withQueryString(),
             'filters' => $filters,
             'sites' => $this->changeSites(),
             'departments' => $this->changeDepartments(),
@@ -111,7 +112,8 @@ class ReportController extends Controller
             ->when($filters['date_from'] !== '', fn ($query) => $query->whereDate('observed_at', '>=', $filters['date_from']))
             ->when($filters['date_to'] !== '', fn ($query) => $query->whereDate('observed_at', '<=', $filters['date_to']))
             ->orderByDesc('observed_at')
-            ->cursor();
+            ->orderByDesc('id')
+            ->lazy(1000); // lazy (chunked) so with('device') eager loading applies, unlike cursor()
 
         return $this->streamCsv('inventory-changes.csv', [
             'observed_at',
@@ -167,21 +169,23 @@ class ReportController extends Controller
 
     private function siteSummaryRows()
     {
-        $sites = CollectorSite::query()
+        $deviceCounts = Device::query()->selectRaw('current_site as name, count(*) as total')->groupBy('current_site')->pluck('total', 'name');
+        $changeCounts = ChangeLog::query()->selectRaw('observed_site as name, count(*) as total')->groupBy('observed_site')->pluck('total', 'name');
+
+        return CollectorSite::query()
             ->withCount(['runners', 'collectors'])
             ->orderBy('site_id')
             ->get()
-            ->map(function (CollectorSite $site): array {
-                $siteNames = array_values(array_filter([$site->site_name, $site->site_id]));
+            ->map(function (CollectorSite $site) use ($deviceCounts, $changeCounts): array {
+                // unique names, matching the old whereIn semantics when site_name === site_id
+                $siteNames = array_unique(array_filter([$site->site_name, $site->site_id]));
 
                 return [
                     'site' => $site,
-                    'device_count' => Device::query()->whereIn('current_site', $siteNames)->count(),
-                    'change_count' => ChangeLog::query()->whereIn('observed_site', $siteNames)->count(),
+                    'device_count' => (int) collect($siteNames)->sum(fn ($n) => $deviceCounts[$n] ?? 0),
+                    'change_count' => (int) collect($siteNames)->sum(fn ($n) => $changeCounts[$n] ?? 0),
                 ];
             });
-
-        return $sites;
     }
 
     private function streamCsv(string $filename, array $headers, callable $writeRows): StreamedResponse

@@ -33,6 +33,10 @@ class Kernel extends ConsoleKernel
             $schedule->command('inventory:prune --force')->dailyAt('03:15')->withoutOverlapping();
         }
 
+        if ((bool) config('inventory.schedule_stale_check')) {
+            $schedule->command('inventory:check-stale')->hourly()->withoutOverlapping();
+        }
+
         if ((bool) config('inventory.schedule_doctor')) {
             $schedule->command('inventory:doctor')->daily()->withoutOverlapping();
         }

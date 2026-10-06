@@ -91,7 +91,17 @@ Assert-Contains $scriptText 'Test-ScheduledTaskExists' 'verifies scheduled task 
 Assert-Contains $scriptText 'Installed config exists and remains direct_https' 'verifies installed config after install'
 Assert-Contains $scriptText 'Invoke-WebRequest -Uri $healthUrl -UseBasicParsing' 'checks HTTPS /health with normal TLS validation'
 
-$resultLineMatches = [regex]::Matches($scriptText, 'Result: \$script:Result')
+Assert-Contains $scriptText 'Windows does not trust the server certificate for' 'gives a clear TLS trust failure message'
+Assert-Contains $scriptText 'Import the internal CA certificate on this PC' 'tells the user how to fix TLS trust'
+Assert-Contains $scriptText 'Invoke-InitialRunnerScan' 'runs the installed runner once after install'
+Assert-Contains $scriptText 'runner_main.ps1' 'uses the installed runner_main.ps1 for the first scan'
+Assert-Contains $scriptText "'last_inventory_status'" 'checks last_inventory_status after first scan'
+Assert-Contains $scriptText 'ConvertTo-RedactedText' 'redacts last_error before reporting'
+Assert-Matches $scriptText 'Invoke-InitialRunnerScan -InstallRoot.*?\$script:Result = ''PASS''' 'reports PASS only after the initial scan check'
+Assert-Contains $scriptText '$ResultPath' 'writes a result file for the launcher'
+Assert-Contains $scriptText 'PauseOnFail' 'keeps the elevated window open on failure'
+
+$resultLineMatches =[regex]::Matches($scriptText, 'Result: \$script:Result')
 Assert-True -Condition ($resultLineMatches.Count -eq 1) -Message 'emits exactly one final Result line in the script'
 
 foreach ($collectorFile in $CollectorFiles) {

@@ -17,7 +17,7 @@ class RunnerController extends Controller
         $query = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
         $freshSince = now()->subHours(24);
-        $targetVersion = (string) config('inventory.runner_target_version', '1.0.19');
+        $targetVersion = (string) config('inventory.runner_target_version');
         $olderVersionIds = [];
 
         if ($status === 'older-version') {
@@ -93,7 +93,7 @@ class RunnerController extends Controller
                 ->with('status', 'Repair/update is not supported for direct HTTPS runners yet.');
         }
 
-        $targetVersion = (string) config('inventory.runner_target_version', '1.0.19');
+        $targetVersion = (string) config('inventory.runner_target_version');
         if ($targetVersion !== '' && version_compare((string) $runner->runner_version, $targetVersion, '>=')) {
             RunnerCommand::query()->create([
                 'runner_id' => $runner->runner_id,
