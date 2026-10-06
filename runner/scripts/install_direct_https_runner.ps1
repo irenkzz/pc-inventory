@@ -320,6 +320,7 @@ function Invoke-RunnerInstaller {
         '-ExecutionPolicy', 'Bypass',
         '-File', $InstallerPath,
         '-SourceRoot', $SourceRoot,
+        '-InstallRoot', $InstallRoot,
         '-SharedRoot', (Join-Path $InstallRoot 'direct-share-unused'),
         '-RunnerId', $ResolvedRunnerId,
         '-SiteId', $siteId,

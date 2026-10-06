@@ -64,6 +64,7 @@ $scriptText = Get-Content -Path $InstallerPath -Raw -Encoding UTF8
 Assert-Contains $scriptText "transportMode -ne 'direct_https'" 'accepts direct_https transport by making it the only allowed mode'
 Assert-Contains $scriptText "collector_share config refused" 'refuses collector_share transport mode'
 Assert-Contains $scriptText 'transport_mode is missing or blank' 'refuses missing transport_mode'
+Assert-Contains $scriptText "'-InstallRoot', `$InstallRoot," 'passes -InstallRoot through to install_runner.ps1 (otherwise a custom root installs into the default production root)'
 Assert-Contains $scriptText "serverUri.Scheme -ne 'https'" 'accepts only HTTPS serverBaseUrl'
 Assert-Contains $scriptText 'Plain http:// is refused' 'refuses HTTP serverBaseUrl'
 Assert-Contains $scriptText "hostName -eq 'localhost'" 'refuses localhost serverBaseUrl'
