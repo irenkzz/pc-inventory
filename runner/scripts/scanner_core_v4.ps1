@@ -118,6 +118,32 @@ function Convert-ToUInt64Value {
     }
 }
 
+function Invoke-SmartCtlBounded {
+    # Runs smartctl with a 30s cap; returns stdout+stderr text (like `2>&1 | Out-String`), '' on timeout.
+    param([string]$Path, [string[]]$Arguments)
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $Path
+    $psi.Arguments = ($Arguments | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    try {
+        $outTask = $proc.StandardOutput.ReadToEndAsync()
+        $errTask = $proc.StandardError.ReadToEndAsync()
+        if (-not $proc.WaitForExit(30000)) {
+            try { $proc.Kill() } catch { }
+            return ''
+        }
+        return ($outTask.Result + $errTask.Result)
+    }
+    finally {
+        $proc.Dispose()
+    }
+}
+
 function Get-SmartCtlPath {
     param([string]$ScriptRoot)
 
@@ -267,7 +293,7 @@ function Get-DiskWriteTelemetry {
         $sourceMethod = ''
         $lastProbeDetail = ''
         foreach ($variant in $probeVariants) {
-            $candidate = & $SmartCtlPath -a -j @($variant) 2>&1 | Out-String
+            $candidate = Invoke-SmartCtlBounded -Path $SmartCtlPath -Arguments (@('-a', '-j') + @($variant))
             if (-not [string]::IsNullOrWhiteSpace($candidate)) {
                 $lastProbeDetail = Normalize-Whitespace $candidate
                 try {

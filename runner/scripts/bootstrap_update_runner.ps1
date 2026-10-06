@@ -44,19 +44,35 @@ function Write-JsonFile {
     param([string]$Path, [object]$Value)
     $dir = Split-Path -Parent $Path
     if ($dir) { Ensure-Directory $dir }
-    $Value | ConvertTo-Json -Depth 8 | Set-Content -Path $Path -Encoding UTF8
+    $tmp = $Path + '.tmp'
+    $Value | ConvertTo-Json -Depth 8 | Set-Content -Path $tmp -Encoding UTF8
+    Move-Item -Path $tmp -Destination $Path -Force
 }
 
 function Grant-RunnerInstallPermissions {
-    param([string]$Path)
+    param([string]$Path, [string]$RunAsUser = '')
 
     if (-not (Test-Path $Path)) { return }
 
+    # ACL matrix (root, scripts\, tools\, update-staging\ inherit from root):
+    #   Administrators + SYSTEM: Full everywhere.  Users: no access to root (no write, no config read).
+    #   SYSTEM task: nothing more needed.
+    #   Current-user task: that one user additionally gets Modify on config\, state\, logs\, data\
+    #   only (runner rewrites config and writes state/logs/data); scripts\ stays read-only for them.
+    foreach ($sub in 'config', 'state', 'logs', 'data') { Ensure-Directory (Join-Path $Path $sub) }
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $output = & icacls.exe $Path /grant '*S-1-5-32-545:(OI)(CI)M' /T /C 2>&1
+        # Strip legacy Users grants from the whole tree, then lock root to Admins+SYSTEM.
+        $output = @(& icacls.exe $Path /remove:g '*S-1-5-32-545' /T /C 2>&1)
+        $output += & icacls.exe $Path /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' 2>&1
         $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0 -and $RunAsUser) {
+            foreach ($sub in 'config', 'state', 'logs', 'data') {
+                $output += & icacls.exe (Join-Path $Path $sub) /grant ($RunAsUser + ':(OI)(CI)M') 2>&1
+                if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+            }
+        }
     }
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -220,7 +236,27 @@ if (-not $ExpectedVersion) {
 
 Write-BootstrapLog "Runner ID: $runnerId"
 Write-BootstrapLog "Target version: $ExpectedVersion"
-Grant-RunnerInstallPermissions -Path $RunnerRoot
+$runAsUserName = ''
+$skipAclTightening = $false
+if ($runAsCurrentUser) {
+    if (-not (Test-IsSystemAccount)) {
+        $runAsUserName = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    } else {
+        # Self-update runs as SYSTEM; the runner task user must be read from the registered task,
+        # otherwise tightening the ACL would lock that user out of config\ and state\.
+        try {
+            $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
+            $taskUser = [string]$existingTask.Principal.UserId
+            if ($taskUser -and $taskUser -notmatch '^(SYSTEM|NT AUTHORITY\SYSTEM|S-1-5-18)$') { $runAsUserName = $taskUser }
+        } catch { }
+        if (-not $runAsUserName) { $skipAclTightening = $true }
+    }
+}
+if ($skipAclTightening) {
+    Write-BootstrapLog 'Current-user runner task user could not be resolved; leaving install root permissions unchanged.'
+} else {
+    Grant-RunnerInstallPermissions -Path $RunnerRoot -RunAsUser $runAsUserName
+}
 
 $previousErrorActionPreference = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
