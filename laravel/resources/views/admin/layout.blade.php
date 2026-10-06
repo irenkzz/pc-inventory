@@ -978,7 +978,7 @@
                     ['label' => 'Runners', 'route' => 'admin.runners.index', 'match' => 'admin.runners.*'],
                     ['label' => 'Collectors', 'route' => 'admin.collectors.index', 'match' => 'admin.collectors.*'],
                     ['label' => 'Commands', 'route' => 'admin.commands.index', 'match' => 'admin.commands.*'],
-                    ['label' => 'Downloads', 'route' => 'admin.downloads.index', 'match' => 'admin.downloads.*'],
+                    ['label' => 'Downloads', 'route' => 'admin.downloads.index', 'match' => 'admin.downloads.*', 'admin' => true],
                 ],
             ],
             [
@@ -1017,6 +1017,7 @@
                 <summary class="nav-menu-label {{ $groupActive ? 'is-active' : '' }}">{{ $group['label'] }}</summary>
                 <div class="nav-menu-items">
                     @foreach($group['items'] as $item)
+                        @continue(! empty($item['admin']) && ! auth()->user()?->isAdmin())
                         <a
                             href="{{ route($item['route']) }}"
                             class="nav-link {{ request()->routeIs($item['match']) ? 'is-active' : '' }}"
