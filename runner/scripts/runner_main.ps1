@@ -548,6 +548,40 @@ function Start-DirectScanAndStage {
     }
 }
 
+$script:DirectOutboxMaxPending = 200
+$script:DirectBackoffBaseMinutes = 5
+$script:DirectBackoffCapMinutes = 360
+
+function Get-DirectBackoffDelayMinutes {
+    param([int]$Attempts, [bool]$Longest = $false)
+
+    $delay = $script:DirectBackoffCapMinutes
+    if (-not $Longest) {
+        $exp = [Math]::Min([Math]::Max($Attempts - 1, 0), 20)
+        $delay = [Math]::Min($script:DirectBackoffBaseMinutes * [Math]::Pow(2, $exp), $script:DirectBackoffCapMinutes)
+    }
+    $jitter = 0.8 + ((Get-Random -Minimum 0 -Maximum 4001) / 10000.0)
+    return ($delay * $jitter)
+}
+
+function Remove-DirectPendingOverflow {
+    param([string]$PendingDir)
+
+    $items = @(Get-ChildItem -Path $PendingDir -Filter '*.json' -File | ForEach-Object {
+        $csv = Join-Path $PendingDir ($_.BaseName + '.csv')
+        $created = if (Test-Path $csv) { (Get-Item $csv).CreationTime } else { [datetime]::MinValue }
+        [PSCustomObject]@{ Meta = $_.FullName; Csv = $csv; Created = $created }
+    } | Sort-Object Created)
+    $excess = $items.Count - $script:DirectOutboxMaxPending
+    if ($excess -le 0) { return }
+    foreach ($item in ($items | Select-Object -First $excess)) {
+        Write-RunnerLog "Direct HTTPS outbox pending cap exceeded ($($script:DirectOutboxMaxPending)); dropping oldest upload $($item.Meta)"
+        foreach ($f in @($item.Meta, $item.Csv)) {
+            if (Test-Path $f) { [System.IO.File]::Delete($f) }
+        }
+    }
+}
+
 function Sync-DirectPendingScans {
     param(
         [string]$OutboxRoot,
@@ -563,6 +597,7 @@ function Sync-DirectPendingScans {
     Ensure-Directory $sentDir
     Ensure-Directory $failedDir
 
+    Remove-DirectPendingOverflow -PendingDir $pendingDir
     $headers = New-DirectRunnerHeaders -SiteId ([string]$State.site_id) -SiteToken $SiteToken
     $metadataFiles = @(Get-ChildItem -Path $pendingDir -Filter '*.json' -File | Sort-Object LastWriteTime)
     foreach ($metadataFile in $metadataFiles) {
@@ -580,6 +615,13 @@ function Sync-DirectPendingScans {
         if (-not (Test-Path $csvPath)) {
             Write-RunnerLog "Direct HTTPS phase=upload CSV missing upload_id=$uploadId metadata=$($metadataFile.FullName); moving available pair to failed."
             Move-OutboxPair -CsvPath $csvPath -MetadataPath $metadataFile.FullName -TargetDir $failedDir
+            continue
+        }
+
+        $nextAttemptRaw = [string](Get-JsonValue -Object $metadata -Name 'next_attempt_at' -Default '')
+        $nextAttemptAt = [datetime]::MinValue
+        if ($nextAttemptRaw -and [datetime]::TryParse($nextAttemptRaw, [ref]$nextAttemptAt) -and (Get-Date) -lt $nextAttemptAt) {
+            Write-RunnerLog "Direct HTTPS phase=upload deferred upload_id=$uploadId next_attempt_at=$nextAttemptRaw"
             continue
         }
 
@@ -608,6 +650,9 @@ function Sync-DirectPendingScans {
             Set-ObjectProperty -Object $metadata -Name 'retry_count' -Value ($retryCount + 1)
             Set-ObjectProperty -Object $metadata -Name 'last_error' -Value $message
             Set-ObjectProperty -Object $metadata -Name 'last_attempt_at' -Value (Get-Date).ToString('s')
+            $delayMinutes = Get-DirectBackoffDelayMinutes -Attempts ($retryCount + 1) -Longest ($statusCode -in @(401, 403))
+            Set-ObjectProperty -Object $metadata -Name 'attempt_count' -Value ($retryCount + 1)
+            Set-ObjectProperty -Object $metadata -Name 'next_attempt_at' -Value (Get-Date).AddMinutes($delayMinutes).ToString('s')
             Write-JsonFile -Path $metadataFile.FullName -Value $metadata
             $State.last_upload_status = 'direct_upload_pending'
             $State.last_error = "Direct HTTPS upload failed: $message"

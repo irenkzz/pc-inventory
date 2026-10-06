@@ -7,6 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 use ZipArchive;
 
 class BackupInventory extends Command
@@ -28,7 +29,13 @@ class BackupInventory extends Command
 
         File::ensureDirectoryExists($backupDir);
 
-        $databaseBackup = $this->backupDatabase($backupDir);
+        try {
+            $databaseBackup = $this->backupDatabase($backupDir);
+        } catch (\RuntimeException $e) {
+            $this->error('FAIL: database backup not created. ' . $e->getMessage());
+
+            return self::FAILURE;
+        }
         $rawArchiveBackup = $this->backupRawArchive($backupDir);
         $downloadsBackup = $this->option('include-downloads') ? $this->backupDownloads($backupDir) : null;
         $siteTokensBackup = $this->backupSiteTokens($backupDir, $siteTokens);
@@ -73,6 +80,12 @@ class BackupInventory extends Command
 
     private function backupDatabase(string $backupDir): ?string
     {
+        $connection = (string) config('database.default');
+        $driver = (string) config("database.connections.{$connection}.driver");
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            return $this->dumpMysql($backupDir, (array) config("database.connections.{$connection}"));
+        }
+
         if (config('database.default') !== 'sqlite') {
             $notePath = $backupDir . DIRECTORY_SEPARATOR . 'database-backup-note.txt';
             File::put($notePath, 'Automated DB file copy is currently implemented for SQLite only. Use native database dump tooling for this connection.');
@@ -87,6 +100,45 @@ class BackupInventory extends Command
 
         $target = $backupDir . DIRECTORY_SEPARATOR . 'database.sqlite';
         File::copy($database, $target);
+
+        return $target;
+    }
+
+    private function dumpMysql(string $backupDir, array $db): string
+    {
+        $target = $backupDir . DIRECTORY_SEPARATOR . 'database.sql';
+        $password = (string) ($db['password'] ?? '');
+        $command = [
+            (string) config('inventory.mysqldump_path', 'mysqldump'),
+            '--single-transaction', '--routines', '--no-tablespaces',
+            '--host=' . ($db['host'] ?? '127.0.0.1'),
+            '--port=' . ($db['port'] ?? '3306'),
+            '--user=' . ($db['username'] ?? ''),
+            '--result-file=' . $target,
+            (string) ($db['database'] ?? ''),
+        ];
+
+        // Overridable in tests: fn (array $command, array $env): array{0:int,1:string} (exit code, stderr).
+        $runner = app()->bound('inventory.mysqldump_runner')
+            ? app('inventory.mysqldump_runner')
+            : function (array $command, array $env): array {
+                $process = new Process($command, null, $env, null, 3600);
+                try {
+                    $process->run();
+                } catch (\Throwable $e) {
+                    return [127, $e->getMessage()];
+                }
+
+                return [$process->getExitCode() ?? 1, $process->getErrorOutput()];
+            };
+
+        [$exit, $stderr] = $runner($command, ['MYSQL_PWD' => $password]);
+
+        if ($exit !== 0 || ! is_file($target)) {
+            File::delete($target);
+            $stderr = $password !== '' ? str_replace($password, '***', $stderr) : $stderr;
+            throw new \RuntimeException('mysqldump failed (exit ' . $exit . '): ' . trim($stderr));
+        }
 
         return $target;
     }
