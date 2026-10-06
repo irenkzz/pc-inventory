@@ -76,6 +76,7 @@ class DirectRunnerAuthService
 
     private function token(Request $request): string
     {
-        return trim((string) ($request->header('X-Site-Token') ?: $request->query('site_token', '')));
+        return trim((string) ($request->header('X-Site-Token')
+            ?: (config('inventory.allow_query_site_token', true) ? $request->query('site_token', '') : '')));
     }
 }

@@ -27,6 +27,20 @@ class DirectRunnerCommandAckService
         abort_if($command === null, 401);
 
         $completionStatus = (string) $payload['status'];
+
+        if ($command->completed_at !== null && $command->status !== 'superseded') {
+            // At-least-once delivery: identical re-ACK is a no-op, a conflicting one is refused.
+            abort_if($command->completion_status !== $completionStatus, 409);
+
+            return [
+                'status' => 'ok',
+                'site_code' => $context['site_code'],
+                'runner_id' => $context['runner_id'],
+                'command_id' => $command->id,
+                'completion_status' => $completionStatus,
+            ];
+        }
+
         $command->forceFill([
             'status' => $completionStatus,
             'acknowledged_at' => now(),

@@ -31,6 +31,7 @@ class InventoryDoctor extends Command
             $this->checkStorageWritable('backups', storage_path('app/' . trim((string) config('inventory.backups_path'), '/'))),
             $this->checkAdminUser(),
             $this->checkSiteTokens($siteTokens, $production),
+            $this->checkIntakeAuth($production),
             $this->checkProductionSettings($production),
             $this->checkProductionRuntime($production),
             $this->checkBackupHistory($production),
@@ -153,6 +154,27 @@ class InventoryDoctor extends Command
         }
 
         return $this->warnCheck('Site tokens', "No site token map found. Collector endpoints will allow any token until configured: {$source}");
+    }
+
+    private function checkIntakeAuth(bool $production): array
+    {
+        $warnings = [];
+
+        if (! config('inventory.require_site_tokens')) {
+            $warnings[] = 'INVENTORY_REQUIRE_SITE_TOKENS is false (collector/direct intake is open when no tokens are loaded)';
+        }
+
+        if (trim((string) config('inventory.central_intake_token', '')) === '') {
+            $warnings[] = 'INVENTORY_CENTRAL_INTAKE_TOKEN is empty (/api/intake/* is unauthenticated)';
+        }
+
+        if ($production && config('inventory.allow_query_site_token', true)) {
+            $warnings[] = 'INVENTORY_ALLOW_QUERY_SITE_TOKEN is true (site tokens accepted in URLs)';
+        }
+
+        return $warnings === []
+            ? $this->passCheck('Intake auth', 'Strict intake authentication is configured.')
+            : $this->warnCheck('Intake auth', implode('; ', $warnings));
     }
 
     private function checkProductionSettings(bool $production): array

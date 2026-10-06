@@ -194,7 +194,9 @@ class CollectorApiTest extends TestCase
             'site_id' => null,
         ]);
 
-        $this->getJson('/api/runners')->assertOk()->assertJsonFragment([
+        $user = \App\Models\User::query()->create(['name' => 'a', 'email' => 'a@x.test', 'password' => bcrypt('pw')]);
+
+        $this->actingAs($user)->getJson('/api/runners')->assertOk()->assertJsonFragment([
             'runner_id' => 'PC-ACCOUNTING-01',
         ]);
     }

@@ -19,6 +19,8 @@ return [
     'site_tokens_json' => env('INVENTORY_SITE_TOKENS_JSON'),
     'site_tokens_file' => env('INVENTORY_SITE_TOKENS_FILE', storage_path('app/inventory/site_tokens.json')),
     'require_site_tokens' => env('INVENTORY_REQUIRE_SITE_TOKENS', false),
+    'allow_query_site_token' => env('INVENTORY_ALLOW_QUERY_SITE_TOKEN', true),
+    'max_upload_kb' => (int) env('INVENTORY_MAX_UPLOAD_KB', 5120),
     'central_intake_token' => env('INVENTORY_CENTRAL_INTAKE_TOKEN'),
     'runner_target_version' => env('INVENTORY_RUNNER_TARGET_VERSION', '1.0.21'),
     'direct_command_redelivery_minutes' => env('INVENTORY_DIRECT_COMMAND_REDELIVERY_MINUTES', 3),
