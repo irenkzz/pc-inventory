@@ -102,11 +102,14 @@ New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 
 $pythonArgs = if ($python.Arguments.Count -gt 0) { ' ' + ($python.Arguments -join ' ') } else { '' }
 $taskRun = "`"$($python.Executable)`"$pythonArgs `"$hiddenLauncherPath`""
+# Windows PowerShell 5.1 passes an argument that starts and ends with a quote to schtasks unchanged, so a
+# Python path with spaces (C:\Program Files\...) is split. Escape the inner quotes and wrap the whole value.
+$taskRunArg = '"' + ($taskRun -replace '"', '\"') + '"'
 
 if ($RunAsCurrentUser) {
-    & schtasks.exe /Create /TN $TaskName /SC MINUTE /MO $PollIntervalMinutes /TR $taskRun /F | Out-Host
+    & schtasks.exe /Create /TN $TaskName /SC MINUTE /MO $PollIntervalMinutes /TR $taskRunArg /F | Out-Host
 } else {
-    & schtasks.exe /Create /TN $TaskName /SC MINUTE /MO $PollIntervalMinutes /TR $taskRun /RU SYSTEM /RL HIGHEST /F | Out-Host
+    & schtasks.exe /Create /TN $TaskName /SC MINUTE /MO $PollIntervalMinutes /TR $taskRunArg /RU SYSTEM /RL HIGHEST /F | Out-Host
 }
 if ($LASTEXITCODE -ne 0) {
     throw "Could not register collector relay scheduled task: $TaskName"
@@ -114,9 +117,9 @@ if ($LASTEXITCODE -ne 0) {
 
 $startupTaskName = "$TaskName-Startup"
 if ($RunAsCurrentUser) {
-    & schtasks.exe /Create /TN $startupTaskName /SC ONLOGON /TR $taskRun /F | Out-Host
+    & schtasks.exe /Create /TN $startupTaskName /SC ONLOGON /TR $taskRunArg /F | Out-Host
 } else {
-    & schtasks.exe /Create /TN $startupTaskName /SC ONSTART /TR $taskRun /RU SYSTEM /RL HIGHEST /F | Out-Host
+    & schtasks.exe /Create /TN $startupTaskName /SC ONSTART /TR $taskRunArg /RU SYSTEM /RL HIGHEST /F | Out-Host
 }
 if ($LASTEXITCODE -ne 0) {
     throw "Could not register collector relay startup task: $startupTaskName"
