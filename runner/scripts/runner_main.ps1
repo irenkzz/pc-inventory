@@ -307,7 +307,8 @@ function Invoke-DirectOutboxFolderCleanup {
         [string]$FolderName,
         [int]$RetentionDays,
         [int]$RetainNewestCount,
-        [datetime]$Now
+        [datetime]$Now,
+        [string[]]$Extensions = @('.csv', '.json')
     )
 
     $folder = Join-Path $OutboxRoot $FolderName
@@ -327,7 +328,7 @@ function Invoke-DirectOutboxFolderCleanup {
 
     foreach ($file in @(Get-ChildItem -Path $folder -File -ErrorAction Stop)) {
         $extension = ([string]$file.Extension).ToLowerInvariant()
-        if ($extension -in @('.csv', '.json')) {
+        if ($extension -in $Extensions) {
             $knownFiles += $file
         } else {
             $skipped++
@@ -396,6 +397,42 @@ function Invoke-DirectOutboxCleanup {
 
     Write-RunnerLog ("Direct HTTPS outbox cleanup summary sent_deleted={0} sent_retained={1} sent_skipped={2} failed_deleted={3} failed_retained={4} failed_skipped={5} pending_deleted=0" -f `
         $sent.Deleted, $sent.Retained, $sent.Skipped, $failed.Deleted, $failed.Retained, $failed.Skipped)
+}
+
+# Keeps runner-main.log from growing without bound: rotate to .1/.2 once it passes MaxBytes.
+function Invoke-RunnerLogRotation {
+    param([string]$LogPath, [long]$MaxBytes = 5242880)
+
+    if (-not (Test-Path -LiteralPath $LogPath)) { return }
+    if ((Get-Item -LiteralPath $LogPath).Length -lt $MaxBytes) { return }
+    $old1 = $LogPath + '.1'
+    $old2 = $LogPath + '.2'
+    if (Test-Path -LiteralPath $old2) { Remove-Item -LiteralPath $old2 -Force }
+    if (Test-Path -LiteralPath $old1) { Move-Item -LiteralPath $old1 -Destination $old2 -Force }
+    Move-Item -LiteralPath $LogPath -Destination $old1 -Force
+}
+
+# Local history is evidence kept on the server; the runner keeps only recent copies.
+# Rule per folder: keep files newer than RetentionDays OR among the newest N. pending-upload and outbox are never touched.
+function Invoke-RunnerLocalCleanup {
+    param([string]$RunnerRoot)
+
+    $now = Get-Date
+    $plans = @(
+        @{ Root = (Join-Path $RunnerRoot 'data'); Folder = 'inventory-results'; Days = 30; Newest = 50; Ext = @('.csv') },
+        @{ Root = (Join-Path $RunnerRoot 'data'); Folder = 'logs'; Days = 30; Newest = 30; Ext = @('.log') },
+        @{ Root = $RunnerRoot; Folder = 'logs'; Days = 90; Newest = 10; Ext = @('.log') }
+    )
+    foreach ($plan in $plans) {
+        try {
+            if (-not (Test-Path -LiteralPath (Join-Path $plan.Root $plan.Folder))) { continue }
+            $r = Invoke-DirectOutboxFolderCleanup -OutboxRoot $plan.Root -FolderName $plan.Folder -RetentionDays $plan.Days -RetainNewestCount $plan.Newest -Now $now -Extensions $plan.Ext
+            Write-RunnerLog ("Local cleanup folder={0} deleted={1} retained={2} skipped={3}" -f $plan.Folder, $r.Deleted, $r.Retained, $r.Skipped)
+        }
+        catch {
+            Write-RunnerLog ("Local cleanup warning folder={0}: {1}" -f $plan.Folder, $_.Exception.Message)
+        }
+    }
 }
 
 function Get-FileSha256 {
@@ -1060,6 +1097,14 @@ if (-not $mutexAcquired) {
     exit 0
 }
 try {
+
+try {
+    Invoke-RunnerLogRotation -LogPath $script:RunnerLogPath
+    Invoke-RunnerLocalCleanup -RunnerRoot $runnerRoot
+}
+catch {
+    Write-RunnerLog ('Local cleanup warning: ' + $_.Exception.Message)
+}
 
 $statePath = Join-Path $stateDir 'runner-state.json'
 $state = Read-JsonFile -Path $statePath
