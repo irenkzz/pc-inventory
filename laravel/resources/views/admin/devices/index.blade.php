@@ -122,6 +122,7 @@
         <div class="form-actions">
             <button type="submit">Filter devices</button>
             <a class="btn secondary" href="{{ route('admin.devices.index') }}">Reset</a>
+            <a class="btn secondary" href="{{ route('admin.devices.export') }}">Export CSV</a>
         </div>
     </form>
 

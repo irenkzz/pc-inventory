@@ -25,6 +25,7 @@
         </div>
         <div class="dashboard-toolbar">
             <a class="btn secondary" href="{{ route('admin.commands.index') }}">Command history</a>
+            <a class="btn secondary" href="{{ route('admin.runners.export') }}">Export CSV</a>
         </div>
     </section>
 
@@ -162,6 +163,7 @@
                         @endif
                     </td>
                     <td class="actions">
+                        @if(auth()->user()?->isAdmin())
                         <form method="post" action="{{ route('admin.runners.manual-scan', $runner) }}">
                             @csrf
                             <button type="submit" @disabled($hasScan)>Manual scan</button>
@@ -173,6 +175,7 @@
                                 @csrf
                                 <button class="secondary" type="submit" @disabled($hasRepair)>Repair/update</button>
                             </form>
+                        @endif
                         @endif
                     </td>
                 </tr>

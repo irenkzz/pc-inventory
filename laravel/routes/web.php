@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CommandController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeviceController;
 use App\Http\Controllers\Admin\DownloadController;
+use App\Http\Controllers\Admin\ExportController;
 use App\Http\Controllers\Admin\InventoryReviewController;
 use App\Http\Controllers\Admin\PilotReadinessController;
 use App\Http\Controllers\Admin\RawEvidenceController;
@@ -41,6 +42,8 @@ Route::post('/logout', [LoginController::class, 'destroy'])->middleware('auth')-
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/', DashboardController::class)->name('admin.dashboard');
+    Route::get('/devices/export', [ExportController::class, 'devices'])->name('admin.devices.export');
+    Route::get('/runners/export', [ExportController::class, 'runners'])->name('admin.runners.export');
     Route::get('/devices', [DeviceController::class, 'index'])->name('admin.devices.index');
     Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('admin.devices.show');
     Route::get('/inventory-review', [InventoryReviewController::class, 'index'])->name('admin.inventory-review.index');

@@ -208,7 +208,9 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertStringContainsString('copies itself locally, then asks for administrator approval', $branchInstructions);
 
         $runnerLauncher = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_THIS_PC_RUNNER_ONLY.cmd'));
-        $this->assertStringContainsString('set "STAGE=%PUBLIC%\\InternalInventorySiteKit\\site-kit-SITE-HQ"', $runnerLauncher);
+        $this->assertStringContainsString('set "STAGE=%LOCALAPPDATA%\\Temp\\InternalInventorySiteKit\\site-kit-SITE-HQ"', $runnerLauncher);
+        $this->assertStringNotContainsString('%PUBLIC%', $runnerLauncher);
+        $this->assertStringContainsString('rmdir /s /q "%STAGE%"', $runnerLauncher);
         $this->assertStringContainsString('pushd "%SOURCE%"', $runnerLauncher);
         $this->assertStringContainsString('robocopy "." "%STAGE%"', $runnerLauncher);
         $this->assertStringContainsString('Start-Process powershell.exe -Verb RunAs', $runnerLauncher);

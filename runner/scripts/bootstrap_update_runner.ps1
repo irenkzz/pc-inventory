@@ -278,6 +278,8 @@ $preserveExact = @(
     'config\inventory-destinations.json',
     'config\runner-config.sample.json',
     'config\runner-config.template.json',
+    'config\update-public-key.xml',   # legacy location; the live anchor is trust\update-public-key.xml
+    'trust\update-public-key.xml',    # trust anchor: never replaced by package contents (rotation = reinstall)
     'scripts\install_runner.cmd',
     'scripts\install_runner.ps1'
 )
@@ -324,6 +326,16 @@ foreach ($file in Get-ChildItem -Path $PackageRoot -Recurse -File) {
 Write-BootstrapLog "Copied package files: $copied"
 
 $config.runnerVersion = $ExpectedVersion
+# Bridge: an already-deployed runner that has no public key yet adopts the package's key (the package
+# was accepted by the existing policy) and starts requiring signed updates. An installed key is never replaced.
+$installedKey = Join-Path $RunnerRoot 'trust\update-public-key.xml'
+$packageKey = Join-Path $PackageRoot 'config\update-public-key.xml'
+if (-not (Test-Path $installedKey) -and (Test-Path $packageKey)) {
+    Ensure-Directory (Split-Path -Parent $installedKey)
+    Copy-Item -Path $packageKey -Destination $installedKey -Force
+    Set-ObjectProperty -Object $config -Name 'requireSignedUpdates' -Value $true
+    Write-BootstrapLog 'Installed update public key from package; signed updates now required.'
+}
 if ($manifest -and $manifest.recommended_scan_interval_minutes) {
     Set-ObjectProperty -Object $config -Name 'scanIntervalMinutes' -Value ([int]$manifest.recommended_scan_interval_minutes)
 }

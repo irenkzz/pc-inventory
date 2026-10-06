@@ -1377,6 +1377,71 @@ $legacyHashSource = @(
 ) -join '|'
 $hardwareHash = Get-BytesSha256Hex -Text $legacyHashSource
 
+# Extra security/health fields: best-effort, never throw, blank when unavailable.
+$batteryPresent = ''
+$batteryHealthPercent = ''
+try {
+    $batteryRows = @(Get-CimInstance -ClassName Win32_Battery -ErrorAction Stop)
+    $batteryPresent = $(if ($batteryRows.Count -gt 0) { 'true' } else { 'false' })
+} catch {}
+if ($batteryPresent -eq 'true') {
+    try {
+        $designCap = [double](@(Get-CimInstance -Namespace root\wmi -ClassName BatteryStaticData -ErrorAction Stop)[0].DesignedCapacity)
+        $fullCap = [double](@(Get-CimInstance -Namespace root\wmi -ClassName BatteryFullChargedCapacity -ErrorAction Stop)[0].FullChargedCapacity)
+        if ($designCap -gt 0 -and $fullCap -gt 0) {
+            $batteryHealthPercent = ([math]::Round(($fullCap / $designCap) * 100, 0)).ToString()
+        }
+    } catch {}
+}
+
+$hotfixCount = ''
+$lastHotfixDate = ''
+try {
+    $hotfixes = @(Get-CimInstance -ClassName Win32_QuickFix -ErrorAction Stop)
+    $hotfixCount = $hotfixes.Count.ToString()
+    $latest = $hotfixes | Where-Object { $_.InstalledOn } | Sort-Object InstalledOn -Descending | Select-Object -First 1
+    if ($latest) { $lastHotfixDate = ([datetime]$latest.InstalledOn).ToString('yyyy-MM-dd') }
+} catch {}
+
+$bitlockerSystemDrive = ''
+try {
+    $sysDrive = $env:SystemDrive
+    $vol = Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftVolumeEncryption' -ClassName Win32_EncryptableVolume -ErrorAction Stop |
+        Where-Object { $_.DriveLetter -eq $sysDrive } | Select-Object -First 1
+    if ($vol) {
+        switch ([int]$vol.ProtectionStatus) {
+            0 { $bitlockerSystemDrive = 'off' }
+            1 { $bitlockerSystemDrive = 'on' }
+            2 { $bitlockerSystemDrive = 'unknown' }
+        }
+    }
+} catch {}
+
+$tpmEnabled = ''
+$tpmActivated = ''
+$tpmSpecVersion = ''
+try {
+    $tpm = Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftTpm' -ClassName Win32_Tpm -ErrorAction Stop | Select-Object -First 1
+    if ($tpm) {
+        $tpmEnabled = ([string]$tpm.IsEnabled_InitialValue).ToLowerInvariant()
+        $tpmActivated = ([string]$tpm.IsActivated_InitialValue).ToLowerInvariant()
+        $tpmSpecVersion = Normalize-Whitespace (Get-TrimmedString (@($tpm.SpecVersion) -join ' '))
+    }
+} catch {}
+
+# Count only; the full software list is intentionally not collected (PII/size).
+$installedSoftwareCount = ''
+try {
+    $uninstallPaths = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    $softwareNames = @(Get-ItemProperty -Path $uninstallPaths -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -and -not $_.SystemComponent -and -not $_.ParentKeyName } |
+        ForEach-Object { $_.DisplayName } | Select-Object -Unique)
+    $installedSoftwareCount = $softwareNames.Count.ToString()
+} catch {}
+
 $scanTime = Get-Date
 $scanTimeIso = $scanTime.ToString('s')
 
@@ -1442,6 +1507,15 @@ $result = [PSCustomObject]@{
     HardwareHash          = $hardwareHash
     Scan_Time             = $scanTimeIso
     Scan_Time_Display     = $scanTime.ToString('yyyy-MM-dd HH:mm:ss')
+    Battery_Present       = $batteryPresent
+    Battery_Health_Percent = $batteryHealthPercent
+    Hotfix_Count          = $hotfixCount
+    Last_Hotfix_Date      = $lastHotfixDate
+    BitLocker_System_Drive = $bitlockerSystemDrive
+    TPM_Enabled           = $tpmEnabled
+    TPM_Activated         = $tpmActivated
+    TPM_Spec_Version      = $tpmSpecVersion
+    Installed_Software_Count = $installedSoftwareCount
 }
 
 $fileName = if ($AppendDateToFileName) {

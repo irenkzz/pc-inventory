@@ -12,6 +12,7 @@ class SiteKitBuilder
     public function __construct(
         private readonly SiteKitProfileValidator $profileValidator,
         private readonly SiteTokenStore $siteTokens,
+        private readonly UpdateSigner $signer,
     )
     {
     }
@@ -74,6 +75,14 @@ class SiteKitBuilder
         }
         $this->deleteGeneratedNoise($buildRoot);
 
+        $signed = $this->signer->hasKey();
+        $signingWarning = null;
+        if ($signed) {
+            File::put($buildRoot . DIRECTORY_SEPARATOR . 'runner/config/update-public-key.xml', $this->signer->publicKeyXml());
+        } else {
+            $signingWarning = 'WARNING: no update signing key found (run inventory:update-keygen on the build host). This kit is UNSIGNED: runners cannot verify self-updates.';
+        }
+
         $runnerConfig = [
             'runnerId' => '<SET-PER-DEVICE>',
             'runnerGuid' => '<GENERATED-ON-INSTALL>',
@@ -92,6 +101,9 @@ class SiteKitBuilder
             'taskRandomDelayMinutes' => $taskRandomDelayMinutes,
             'runAsCurrentUser' => true,
         ];
+        if ($signed) {
+            $runnerConfig['requireSignedUpdates'] = true;
+        }
 
         if ($transportMode === 'direct_https') {
             $runnerConfig['transport_mode'] = 'direct_https';
@@ -120,7 +132,13 @@ class SiteKitBuilder
         ];
 
         $this->writeJson($buildRoot . DIRECTORY_SEPARATOR . 'runner/config/runner-config.template.json', $runnerConfig);
-        $this->writeJson($buildRoot . DIRECTORY_SEPARATOR . 'runner/manifest/runner-manifest.json', $manifest);
+
+        $runnerDir = $buildRoot . DIRECTORY_SEPARATOR . 'runner';
+        $manifest['files'] = $this->packageFiles($runnerDir);
+        $manifest['signed'] = $signed;
+        $manifestJson = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $signature = $signed ? $this->signer->sign($manifestJson) : null;
+        $this->writeManifest($runnerDir . DIRECTORY_SEPARATOR . 'manifest', $manifestJson, $signature);
 
         if ($collectorEnabled) {
             $this->writeJson($buildRoot . DIRECTORY_SEPARATOR . 'collector/collector_config.json', $collectorConfig);
@@ -128,7 +146,7 @@ class SiteKitBuilder
             $currentRunnerDir = $buildRoot . DIRECTORY_SEPARATOR . 'branch-share/packages/runner/current';
             File::ensureDirectoryExists(dirname($currentRunnerDir));
             File::copyDirectory($buildRoot . DIRECTORY_SEPARATOR . 'runner', $currentRunnerDir);
-            $this->writeJson($buildRoot . DIRECTORY_SEPARATOR . 'branch-share/packages/runner/runner-manifest.json', $manifest);
+            $this->writeManifest($buildRoot . DIRECTORY_SEPARATOR . 'branch-share/packages/runner', $manifestJson, $signature);
         }
 
         if ($transportMode !== 'direct_https') {
@@ -209,7 +227,34 @@ class SiteKitBuilder
             'runner_poll_interval_minutes' => $runnerPollIntervalMinutes,
             'collector_poll_interval_minutes' => $collectorPollIntervalMinutes,
             'profile_warnings' => $profileWarnings,
+            'signed' => $signed,
+            'signing_warning' => $signingWarning,
         ];
+    }
+
+    /** Every file in the package except the manifest and its signature: [{path, sha256, size}]. */
+    private function packageFiles(string $runnerDir): array
+    {
+        $files = [];
+        foreach (File::allFiles($runnerDir, true) as $file) {
+            $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($runnerDir) + 1));
+            if ($relative === 'manifest/runner-manifest.json' || $relative === 'manifest/runner-manifest.sig') {
+                continue;
+            }
+            $files[] = ['path' => $relative, 'sha256' => hash_file('sha256', $file->getPathname()), 'size' => $file->getSize()];
+        }
+        usort($files, fn (array $a, array $b): int => strcmp($a['path'], $b['path']));
+
+        return $files;
+    }
+
+    private function writeManifest(string $dir, string $manifestJson, ?string $signature): void
+    {
+        File::ensureDirectoryExists($dir);
+        File::put($dir . DIRECTORY_SEPARATOR . 'runner-manifest.json', $manifestJson);
+        if ($signature !== null) {
+            File::put($dir . DIRECTORY_SEPARATOR . 'runner-manifest.sig', $signature);
+        }
     }
 
     private function loadProfile(string $path): array
@@ -470,7 +515,7 @@ class SiteKitBuilder
         return "@echo off\r\n"
             . "setlocal\r\n"
             . "set \"SOURCE=%~dp0\"\r\n"
-            . "set \"STAGE=%PUBLIC%\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
+            . "set \"STAGE=%LOCALAPPDATA%\\Temp\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
             . "echo This installs the collector site for HQ/branch/multi-PC collector-share mode.\r\n"
             . "echo Staging collector-site installer locally...\r\n"
             . "pushd \"%SOURCE%\"\r\n"
@@ -491,6 +536,7 @@ class SiteKitBuilder
             . ")\r\n"
             . "cd /d \"%STAGE%\"\r\n"
             . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\collector\\install_collector_site.ps1','-CollectorRoot','%STAGE%\\collector','-ConfigPath','%STAGE%\\collector\\collector_config.json')\"\r\n"
+            . $this->stageCleanup(false)
             . "echo.\r\n"
             . "echo Collector-site installer finished. If there were errors, send the installer log path shown above to IT.\r\n"
             . "pause\r\n";
@@ -501,7 +547,7 @@ class SiteKitBuilder
         return "@echo off\r\n"
             . "setlocal\r\n"
             . "set \"SOURCE=%~dp0\"\r\n"
-            . "set \"STAGE=%PUBLIC%\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
+            . "set \"STAGE=%LOCALAPPDATA%\\Temp\\InternalInventorySiteKit\\site-kit-{$siteId}\"\r\n"
             . "echo Staging installer locally...\r\n"
             . "pushd \"%SOURCE%\"\r\n"
             . "if errorlevel 1 (\r\n"
@@ -520,7 +566,16 @@ class SiteKitBuilder
             . "  exit /b %RC%\r\n"
             . ")\r\n"
             . "cd /d \"%STAGE%\"\r\n"
-            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\INSTALL_SITE_KIT.ps1','-Mode','{$mode}','-UseComputerNameAsRunnerId')\"\r\n";
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\INSTALL_SITE_KIT.ps1','-Mode','{$mode}','-UseComputerNameAsRunnerId')\"\r\n"
+            . $this->stageCleanup(true);
+    }
+
+    /** Remove the per-user stage (it holds the site token); optionally hand the install log back to the kit folder. */
+    private function stageCleanup(bool $keepLog): string
+    {
+        return ($keepLog ? "if exist \"%STAGE%\\install-site-kit.log\" copy /y \"%STAGE%\\install-site-kit.log\" \"%SOURCE%install-site-kit.log\" >nul 2>nul\r\n" : '')
+            . "cd /d \"%TEMP%\"\r\n"
+            . "if exist \"%STAGE%\" rmdir /s /q \"%STAGE%\"\r\n";
     }
 
     private function forceUpdateCmd(string $packageRelativePath): string
@@ -528,7 +583,7 @@ class SiteKitBuilder
         return "@echo off\r\n"
             . "setlocal\r\n"
             . "set \"PACKAGE=%~dp0{$packageRelativePath}\"\r\n"
-            . "set \"STAGE=%PUBLIC%\\InternalInventoryRunnerUpdate\\current\"\r\n"
+            . "set \"STAGE=%LOCALAPPDATA%\\Temp\\InternalInventoryRunnerUpdate\\current\"\r\n"
             . "pushd \"%PACKAGE%\"\r\n"
             . "if errorlevel 1 (\r\n"
             . "  echo Could not access updater package: %PACKAGE%\r\n"
@@ -553,6 +608,7 @@ class SiteKitBuilder
             . "  exit /b %RC%\r\n"
             . ")\r\n"
             . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\scripts\\bootstrap_update_runner.ps1','-PackageRoot','%STAGE%','-RunAfterUpdate','-NoElevate')\"\r\n"
+            . $this->stageCleanup(false)
             . "echo.\r\n"
             . "echo Force update finished. If there were errors, send the bootstrap-update log from C:\\ProgramData\\InternalInventoryRunner\\logs to IT.\r\n"
             . "pause\r\n";

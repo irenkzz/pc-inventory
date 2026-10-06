@@ -51,6 +51,9 @@ class BuildSiteKit extends Command
         }
 
         $this->line(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        if (! empty($result['signing_warning'])) {
+            $this->warn($result['signing_warning']);
+        }
 
         return self::SUCCESS;
     }
