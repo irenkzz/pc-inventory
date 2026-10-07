@@ -408,7 +408,7 @@ class SiteKitBuilder
             . "  exit /b %RC%\r\n"
             . ")\r\n"
             . "cd /d \"%STAGE%\"\r\n"
-            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\runner\\scripts\\install_direct_https_runner.ps1','-ConfigPath','%STAGE%\\runner\\config\\runner-config.template.json','-UseComputerNameAsRunnerId','-ResultPath','%RESULT%','-PauseOnFail')\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','\\\"%STAGE%\\runner\\scripts\\install_direct_https_runner.ps1\\\"','-ConfigPath','\\\"%STAGE%\\runner\\config\\runner-config.template.json\\\"','-UseComputerNameAsRunnerId','-ResultPath','\\\"%RESULT%\\\"','-PauseOnFail')\"\r\n"
             . "if exist \"%RESULT%\" (\r\n"
             . "  for /f \"usebackq tokens=1,* delims==\" %%A in (\"%RESULT%\") do (\r\n"
             . "    if /i \"%%A\"==\"status\" set \"STATUS=%%B\"\r\n"
@@ -539,7 +539,7 @@ class SiteKitBuilder
             . "  exit /b %RC%\r\n"
             . ")\r\n"
             . "cd /d \"%STAGE%\"\r\n"
-            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\collector\\install_collector_site.ps1','-CollectorRoot','%STAGE%\\collector','-ConfigPath','%STAGE%\\collector\\collector_config.json')\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','\\\"%STAGE%\\collector\\install_collector_site.ps1\\\"','-CollectorRoot','\\\"%STAGE%\\collector\\\"','-ConfigPath','\\\"%STAGE%\\collector\\collector_config.json\\\"')\"\r\n"
             . $this->stageCleanup(false)
             . "echo.\r\n"
             . "echo Collector-site installer finished. If there were errors, send the installer log path shown above to IT.\r\n"
@@ -570,7 +570,7 @@ class SiteKitBuilder
             . "  exit /b %RC%\r\n"
             . ")\r\n"
             . "cd /d \"%STAGE%\"\r\n"
-            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\INSTALL_SITE_KIT.ps1','-Mode','{$mode}','-UseComputerNameAsRunnerId')\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','\\\"%STAGE%\\INSTALL_SITE_KIT.ps1\\\"','-Mode','{$mode}','-UseComputerNameAsRunnerId')\"\r\n"
             . $this->stageCleanup(true);
     }
 
@@ -611,7 +611,7 @@ class SiteKitBuilder
             . "  pause\r\n"
             . "  exit /b %RC%\r\n"
             . ")\r\n"
-            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','%STAGE%\\scripts\\bootstrap_update_runner.ps1','-PackageRoot','%STAGE%','-RunAfterUpdate','-NoElevate')\"\r\n"
+            . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','\\\"%STAGE%\\scripts\\bootstrap_update_runner.ps1\\\"','-PackageRoot','\\\"%STAGE%\\\"','-RunAfterUpdate','-NoElevate')\"\r\n"
             . $this->stageCleanup(false)
             . "echo.\r\n"
             . "echo Force update finished. If there were errors, send the bootstrap-update log from C:\\ProgramData\\InternalInventoryRunner\\logs to IT.\r\n"

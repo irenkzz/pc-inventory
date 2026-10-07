@@ -216,6 +216,19 @@ class SiteProfileValidationCommandTest extends TestCase
         $this->assertStringContainsString('Start-Process powershell.exe -Verb RunAs', $runnerLauncher);
         $this->assertStringNotContainsString('install_direct_https_runner.ps1', $runnerLauncher);
 
+        // A user profile path with a space (e.g. "Legion 15") must survive Start-Process: every
+        // %STAGE%/%RESULT% path in -ArgumentList has to be wrapped in quotes or the elevated
+        // PowerShell exits at once with no log.
+        foreach (glob(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/*.cmd')) as $launcherPath) {
+            foreach (file($launcherPath, FILE_IGNORE_NEW_LINES) as $line) {
+                if (! str_contains($line, 'Start-Process powershell.exe -Verb RunAs')) {
+                    continue;
+                }
+                $this->assertDoesNotMatchRegularExpression("/'%(STAGE|RESULT)%[^']*'/", $line, basename($launcherPath) . ' passes an unquoted path to Start-Process');
+                $this->assertStringContainsString("'\\\"%STAGE%", $line, basename($launcherPath));
+            }
+        }
+
         $collectorSiteLauncher = (string) file_get_contents(storage_path('app/framework/testing/site-kit-build/site-kit-SITE-HQ/INSTALL_COLLECTOR_SITE.cmd'));
         $this->assertStringContainsString('HQ/branch/multi-PC collector-share mode', $collectorSiteLauncher);
         $this->assertStringContainsString('collector\\install_collector_site.ps1', $collectorSiteLauncher);
@@ -457,7 +470,7 @@ class SiteProfileValidationCommandTest extends TestCase
 
         $this->assertStringContainsString('%LOCALAPPDATA%\\Temp\\InternalInventorySiteKit\\site-kit-SITE-HQ', $directRunnerLauncher);
         $this->assertStringNotContainsString('%PUBLIC%', $directRunnerLauncher);
-        $this->assertStringContainsString("'-ResultPath','%RESULT%','-PauseOnFail'", $directRunnerLauncher);
+        $this->assertStringContainsString("'-ResultPath','\\\"%RESULT%\\\"','-PauseOnFail'", $directRunnerLauncher);
         $this->assertStringContainsString('RESULT: FAIL', $directRunnerLauncher);
         $this->assertStringContainsString('exit /b 1', $directRunnerLauncher);
         $this->assertGreaterThan(
